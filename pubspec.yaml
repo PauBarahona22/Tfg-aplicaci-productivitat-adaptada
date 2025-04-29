@@ -1,0 +1,30 @@
+name: aplicaciotempstfg
+description: "Aplicación móvil para gestión del tiempo y productividad personal adaptada a TDAH."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Firebase
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.17.4
+  cloud_firestore: ^4.15.7
+  firebase_storage: ^11.7.7
+  image_picker: ^1.1.0
+
+  # Notificaciones locales
+  flutter_local_notifications: ^17.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "601885291014",
+    "project_id": "tfg-app-productivitat-adaptada",
+    "storage_bucket": "tfg-app-productivitat-adaptada.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:601885291014:android:ccfacc4b2717c261380987",
+        "android_client_info": {
+          "package_name": "com.example.aplicaciotempstfg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDdNrrtvduY7jo69QWHp9WQ7KNNIQy2io"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
