@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'home_screen.dart';
+import 'main_navigation_screen.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -18,16 +18,16 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _checkLoginStatus() async {
-    await Future.delayed(const Duration(seconds: 2)); 
+    await Future.delayed(const Duration(seconds: 2));
 
     if (FirebaseAuth.instance.currentUser != null) {
-      if (mounted) {//User loged
+      if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
         );
       }
-    } else {//User not loged
+    } else {
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -41,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: CircularProgressIndicator(), 
+        child: CircularProgressIndicator(),
       ),
     );
   }
