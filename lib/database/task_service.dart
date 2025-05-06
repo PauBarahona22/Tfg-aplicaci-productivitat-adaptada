@@ -11,13 +11,11 @@ class TaskService {
         .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snap) =>
-            snap.docs.map((doc) => TaskModel.fromDoc(doc)).toList());
+            snap.docs.map((d) => TaskModel.fromDoc(d)).toList());
   }
 
-  Future<void> addTask(TaskModel task) {
-    return _firestore
-        .collection('tasks')
-        .add(task.toMap());
+  Future<DocumentReference<Map<String, dynamic>>> addTask(TaskModel task) {
+    return _firestore.collection('tasks').add(task.toMap());
   }
 
   Future<void> updateTask(TaskModel task) {
@@ -28,9 +26,7 @@ class TaskService {
   }
 
   Future<void> deleteTask(String id) {
-    return _firestore
-        .collection('tasks')
-        .doc(id)
-        .delete();
+    return _firestore.collection('tasks').doc(id).delete();
   }
 }
+
