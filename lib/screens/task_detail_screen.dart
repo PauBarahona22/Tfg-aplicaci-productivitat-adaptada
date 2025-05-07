@@ -1,5 +1,8 @@
+// lib/screens/task_detail_screen.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/task_model.dart';
@@ -31,12 +34,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   String _type = _allTypes.first;
 
   List<String> _subtasks = [];
-  List<bool>  _subtaskChecked = [];
+  List<bool> _subtaskChecked = [];
 
   DateTime? _dueDate;
-  bool _isDone   = false;
-  int  _priority = 0;
-  bool _remind   = false;
+  late DateTime _createdAt;
+  bool _isDone = false;
+  int _priority = 0;
+  bool _remind = false;
   late final String _uid;
   bool _editingTitle = false;
 
@@ -48,16 +52,25 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     _uid = FirebaseAuth.instance.currentUser!.uid;
 
     if (widget.task != null) {
-      // Subscripció en temps real al doc
+      final t = widget.task!;
+      _titleCtrl.text = t.title;
+      _notesCtrl.text = t.notes;
+      _type = t.type;
+      _dueDate = t.dueDate;
+      _createdAt = t.createdAt;
+      _isDone = t.isDone;
+      _priority = t.priority;
+      _remind = t.remind;
+      _subtasks = List.from(t.subtasks);
+      _subtaskChecked = List<bool>.filled(_subtasks.length, _isDone);
+
       _docSub = FirebaseFirestore.instance
           .collection('tasks')
-          .doc(widget.task!.id)
+          .doc(t.id)
           .snapshots()
           .listen(_onRemoteUpdate);
     } else {
-      // Nova tasca: mantenim valors per defecte
-      _titleCtrl.text = '';
-      _notesCtrl.text = '';
+      _createdAt = DateTime.now();
     }
   }
 
@@ -67,16 +80,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     setState(() {
       _titleCtrl.text = t.title;
       _notesCtrl.text = t.notes;
-      _type = _allTypes.firstWhere(
-        (e) => e.toLowerCase() == t.type.toLowerCase(),
-        orElse: () => _allTypes.first,
-      );
+      _type = t.type;
       _dueDate = t.dueDate;
+      _createdAt = t.createdAt;
       _isDone = t.isDone;
       _priority = t.priority;
       _remind = t.remind;
       _subtasks = List.from(t.subtasks);
-      // Ajustem checks: tots fets si t.isDone és true, sinó tots a false
       _subtaskChecked = List<bool>.filled(_subtasks.length, t.isDone);
     });
   }
@@ -114,16 +124,47 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _pickDueDate() async {
     final now = DateTime.now();
-    final sel = await showDatePicker(
+    final selDate = await showDatePicker(
       context: context,
       initialDate: _dueDate ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
     );
-    if (sel != null) {
-      setState(() => _dueDate = sel);
-      await _save(quiet: true);
+    if (selDate == null) return;
+
+    final selTime = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 23, minute: 59),
+    );
+
+    final candidate = DateTime(
+      selDate.year,
+      selDate.month,
+      selDate.day,
+      selTime?.hour ?? 23,
+      selTime?.minute ?? 59,
+    );
+
+    if (candidate.isBefore(now)) {
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Data passada'),
+          content: const Text('No pots assignar un venciment en el passat.'),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('D\'acord'))],
+        ),
+      );
+      return;
     }
+
+    setState(() => _dueDate = candidate);
+    await _save(quiet: true);
+  }
+
+  int get _daysRemaining {
+    if (_dueDate == null) return 0;
+    final diff = _dueDate!.difference(DateTime.now()).inDays;
+    return diff > 0 ? diff : 1;
   }
 
   String get _status {
@@ -132,7 +173,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return 'Pendent';
   }
 
-  /// Guarda canvis a Firestore però **no** tanca la pantalla si `quiet=true`.
   Future<void> _save({bool quiet = false}) async {
     if (_titleCtrl.text.trim().isEmpty) {
       if (!quiet) {
@@ -145,17 +185,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
     final isNew = widget.task == null;
     final model = TaskModel(
-      id:        isNew ? '' : widget.task!.id,
-      ownerId:   _uid,
-      title:     _titleCtrl.text.trim(),
-      notes:     _notesCtrl.text.trim(),
-      createdAt: widget.task?.createdAt ?? DateTime.now(),
-      dueDate:   _dueDate,
-      isDone:    _isDone,
-      priority:  _priority,
-      type:      _type,
-      remind:    _remind,
-      subtasks:  _subtasks,
+      id: isNew ? '' : widget.task!.id,
+      ownerId: _uid,
+      title: _titleCtrl.text.trim(),
+      notes: _notesCtrl.text.trim(),
+      createdAt: _createdAt,
+      dueDate: _dueDate,
+      isDone: _isDone,
+      priority: _priority,
+      type: _type,
+      remind: _remind,
+      subtasks: _subtasks,
     );
 
     if (isNew) {
@@ -176,7 +216,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Eliminar tasca?'),
-        content: const Text('Estàs segur que vols eliminar aquesta tasca?'),
+        content: const Text('Estàs segur que la vols eliminar?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
           ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sí')),
@@ -191,18 +231,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   void _toggleReminderSnackbar() {
     _save(quiet: true);
-    final msg = _remind
-      ? 'Recordatori 24 h activat'
-      : 'Recordatori 24 h desactivat';
+    final msg = _remind ? 'Recordatori 24 h activat' : 'Recordatori 24 h desactivat';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final isNew      = widget.task == null;
-    final appBarTitle = isNew ? 'Nova Tasca' : widget.task!.title;
+    final isNew = widget.task == null;
+    final titleText = isNew ? 'Nova Tasca' : widget.task!.title;
 
-    // Garantim coherència entre subtasques i checks
     if (_subtaskChecked.length != _subtasks.length) {
       _subtaskChecked = List<bool>.filled(_subtasks.length, _isDone);
     }
@@ -211,36 +248,35 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       appBar: AppBar(
         leading: const BackButton(),
         title: _editingTitle
-          ? TextField(
-              controller: _titleCtrl,
-              autofocus: true,
-              decoration: const InputDecoration(border: InputBorder.none),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              onSubmitted: (_) {
-                setState(() => _editingTitle = false);
-                _save();
-              },
-            )
-          : Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    appBarTitle,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ? TextField(
+                controller: _titleCtrl,
+                autofocus: true,
+                maxLength: 50,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  counterText: '',
+                ),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                onSubmitted: (_) {
+                  setState(() => _editingTitle = false);
+                  _save();
+                },
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      titleText,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => setState(() => _editingTitle = true),
-                ),
-              ],
-            ),
+                  IconButton(icon: const Icon(Icons.edit), onPressed: () => setState(() => _editingTitle = true)),
+                ],
+              ),
         actions: [
           IconButton(
-            icon: Icon(
-              _isDone ? Icons.check_box : Icons.check_box_outline_blank,
-              size: 28,
-            ),
+            icon: Icon(_isDone ? Icons.check_box : Icons.check_box_outline_blank, size: 28),
             onPressed: () {
               setState(() => _isDone = !_isDone);
               _save(quiet: true);
@@ -248,7 +284,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ),
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
@@ -306,7 +341,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
             const Divider(height: 32),
 
-            // Tipus + Estat + Mascota
+            // Tipus + Estat + Temps restant + Mascota
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -317,9 +352,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       DropdownButtonFormField<String>(
                         value: _type,
                         decoration: const InputDecoration(labelText: 'Tipus'),
-                        items: _allTypes
-                            .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                            .toList(),
+                        items: _allTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                         onChanged: (v) {
                           setState(() => _type = v!);
                           _save(quiet: true);
@@ -327,16 +360,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text('Estat: $_status'),
+                      if (_dueDate != null) ...[
+                        const SizedBox(height: 4),
+                        Text('Temps restant: $_daysRemaining ${_daysRemaining == 1 ? 'dia' : 'dies'}'),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(width: 16),
                 Container(
-                  width: 72, height: 72,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
                   alignment: Alignment.center,
                   child: const Text('D', style: TextStyle(fontSize: 24)),
                 ),
@@ -368,15 +403,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Data de venciment'),
               subtitle: Text(_dueDate != null
-                  ? '${_dueDate!.day}/${_dueDate!.month}/${_dueDate!.year}'
+                  ? '${_dueDate!.day}/${_dueDate!.month}/${_dueDate!.year} '
+                    '${_dueDate!.hour.toString().padLeft(2,'0')}:'
+                    '${_dueDate!.minute.toString().padLeft(2,'0')}'
                   : 'Cap'),
               trailing: const Icon(Icons.calendar_today),
               onTap: _pickDueDate,
             ),
 
+            // Data de creació
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Data de creació'),
+              subtitle: Text(
+                '${_createdAt.day}/${_createdAt.month}/${_createdAt.year} '
+                '${_createdAt.hour.toString().padLeft(2,'0')}:'
+                '${_createdAt.minute.toString().padLeft(2,'0')}',
+              ),
+            ),
+
             const SizedBox(height: 16),
 
-            // Assignar dia calendari
+            // Assignar dia calendari (placeholder)
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Assignar dia calendari'),
@@ -384,7 +432,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               onTap: () {/* TODO */},
             ),
 
-            // Assignar recordatori
+            // Assignar recordatori (placeholder)
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Assignar recordatori'),
@@ -407,11 +455,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             // Notes
             TextField(
               controller: _notesCtrl,
+              maxLines: 3,
+              maxLength: 200,
+              maxLengthEnforcement: MaxLengthEnforcement.enforced,
               decoration: const InputDecoration(
                 labelText: 'Afegir nota',
                 border: OutlineInputBorder(),
               ),
-              maxLines: 3,
               onSubmitted: (_) => _save(quiet: true),
             ),
           ],
@@ -427,7 +477,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               child: ElevatedButton(
                 onPressed: () async {
                   await _save();
-                  // No fem Navigator.pop(); l’usuari pot prémer la fletxa
                 },
                 child: const Text('Guardar'),
               ),
