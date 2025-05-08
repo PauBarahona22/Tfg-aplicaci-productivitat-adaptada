@@ -7,9 +7,20 @@ environment:
   sdk: ^3.7.2
 
 dependencies:
+  # Flutter core
   flutter:
     sdk: flutter
+
+  # Localizations (incluye intl 0.19.0)
+  flutter_localizations:
+    sdk: flutter
+
+  # UI
   cupertino_icons: ^1.0.8
+  table_calendar: ^3.0.9
+
+  # Internacionalización
+  intl: ^0.19.0
 
   # Firebase
   firebase_core: ^2.32.0
@@ -28,8 +39,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets: 
+  assets:
     - assets/
-
-
-

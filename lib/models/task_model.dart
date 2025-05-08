@@ -12,6 +12,7 @@ class TaskModel {
   final String type;
   final bool remind;
   final List<String> subtasks;
+  final List<DateTime> assignedDates;
 
   TaskModel({
     required this.id,
@@ -25,6 +26,7 @@ class TaskModel {
     this.type = 'General',
     this.remind = false,
     this.subtasks = const [],
+    this.assignedDates = const [],
   });
 
   TaskModel copyWith({
@@ -39,6 +41,7 @@ class TaskModel {
     String? type,
     bool? remind,
     List<String>? subtasks,
+    List<DateTime>? assignedDates,
   }) {
     return TaskModel(
       id: id ?? this.id,
@@ -52,6 +55,7 @@ class TaskModel {
       type: type ?? this.type,
       remind: remind ?? this.remind,
       subtasks: subtasks ?? this.subtasks,
+      assignedDates: assignedDates ?? this.assignedDates,
     );
   }
 
@@ -67,11 +71,20 @@ class TaskModel {
       'type': type,
       'remind': remind,
       'subtasks': subtasks,
+      'assignedDates': assignedDates.map((date) => date.toIso8601String()).toList(),
     };
   }
 
   factory TaskModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
+    
+    List<DateTime> assignedDates = [];
+    if (data['assignedDates'] != null) {
+      assignedDates = List<String>.from(data['assignedDates'] as List<dynamic>? ?? [])
+          .map((dateStr) => DateTime.parse(dateStr))
+          .toList();
+    }
+    
     return TaskModel(
       id: doc.id,
       ownerId: data['ownerId'] as String,
@@ -86,6 +99,7 @@ class TaskModel {
       type: data['type'] as String? ?? 'General',
       remind: data['remind'] as bool? ?? false,
       subtasks: List<String>.from(data['subtasks'] as List<dynamic>? ?? []),
+      assignedDates: assignedDates,
     );
   }
 }

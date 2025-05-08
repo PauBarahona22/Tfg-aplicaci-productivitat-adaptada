@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import '../models/task_model.dart';
 import '../database/task_service.dart';
 
@@ -44,6 +45,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   late final String _uid;
   bool _editingTitle = false;
 
+  // Nuevo campo para las fechas asignadas
+  List<DateTime> _assignedDates = [];
+
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _docSub;
 
   @override
@@ -63,6 +67,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _remind = t.remind;
       _subtasks = List.from(t.subtasks);
       _subtaskChecked = List<bool>.filled(_subtasks.length, _isDone);
+
+      // Inicializar assignedDates desde la tarea original
+      _assignedDates = List.from(t.assignedDates);
 
       _docSub = FirebaseFirestore.instance
           .collection('tasks')
@@ -88,6 +95,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _remind = t.remind;
       _subtasks = List.from(t.subtasks);
       _subtaskChecked = List<bool>.filled(_subtasks.length, t.isDone);
+
+      // Actualizar assignedDates desde Firestore
+      _assignedDates = List.from(t.assignedDates);
     });
   }
 
@@ -196,6 +206,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       type: _type,
       remind: _remind,
       subtasks: _subtasks,
+      assignedDates: _assignedDates, // Asegúrate que TaskModel acepta este campo
     );
 
     if (isNew) {
@@ -223,7 +234,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ],
       ),
     );
-    if (ok == true) {
+    if (ok == true && widget.task != null) {
       await _taskService.deleteTask(widget.task!.id);
       Navigator.pop(context);
     }
@@ -308,10 +319,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       leading: Checkbox(
                         value: _subtaskChecked[i],
                         onChanged: (v) {
-                          setState(() {
-                            _subtaskChecked[i] = v!;
-                            _isDone = _subtaskChecked.every((c) => c);
-                          });
+                          setState(() => _subtaskChecked[i] = v!);
+                          _isDone = _subtaskChecked.every((c) => c);
                           _save(quiet: true);
                         },
                       ),
@@ -341,7 +350,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
             const Divider(height: 32),
 
-            // Tipus + Estat + Temps restant + Mascota
+            // Tipus + Estat + Temps restant
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -424,21 +433,60 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
             const SizedBox(height: 16),
 
-            // Assignar dia calendari (placeholder)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Assignar dia calendari'),
-              trailing: const Icon(Icons.calendar_view_month),
-              onTap: () {/* TODO */},
+            // Assignar dia calendari
+            ElevatedButton.icon(
+              icon: const Icon(Icons.calendar_today),
+              label: const Text('Assignar dia calendari'),
+              onPressed: isNew
+                  ? null
+                  : () async {
+                      final selectedDate = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                        locale: const Locale('ca'),
+                      );
+                      if (selectedDate != null && widget.task != null) {
+                        await _taskService.assignTaskToCalendar(widget.task!, selectedDate);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Tasca assignada al dia ${DateFormat('dd/MM/yyyy','ca').format(selectedDate)}'
+                            ),
+                          ),
+                        );
+                        // Confiamos en _onRemoteUpdate para refrescar _assignedDates
+                      }
+                    },
             ),
 
-            // Assignar recordatori (placeholder)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Assignar recordatori'),
-              trailing: const Icon(Icons.notifications),
-              onTap: () {/* TODO */},
-            ),
+            // Mostrar les dates assignades
+            if (!isNew && _assignedDates.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Dies assignats:', style: Theme.of(context).textTheme.bodyLarge),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _assignedDates.map((date) {
+                  return Chip(
+                    label: Text(DateFormat('dd/MM/yyyy','ca').format(date)),
+                    deleteIcon: const Icon(Icons.close, size: 18),
+                    onDeleted: () async {
+                      if (widget.task == null) return;
+                      await _taskService.removeAssignedDate(widget.task!, date);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Assignació eliminada')),
+                      );
+                      // Confiamos en _onRemoteUpdate para refrescar _assignedDates
+                    },
+                  );
+                }).toList(),
+              ),
+            ],
+
+            const Divider(height: 32),
 
             // Recordatori 24 h abans
             SwitchListTile(

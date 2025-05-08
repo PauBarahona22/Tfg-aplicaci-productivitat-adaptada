@@ -28,5 +28,37 @@ class TaskService {
   Future<void> deleteTask(String id) {
     return _firestore.collection('tasks').doc(id).delete();
   }
+  
+  Future<void> assignTaskToCalendar(TaskModel task, DateTime date) async {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    
+    List<DateTime> assignedDates = List.from(task.assignedDates);
+    
+    bool alreadyAssigned = assignedDates.any((d) => 
+      d.year == normalizedDate.year && 
+      d.month == normalizedDate.month && 
+      d.day == normalizedDate.day
+    );
+    
+    if (!alreadyAssigned) {
+      assignedDates.add(normalizedDate);
+      
+      final updatedTask = task.copyWith(assignedDates: assignedDates);
+      await updateTask(updatedTask);
+    }
+  }
+  
+  Future<void> removeAssignedDate(TaskModel task, DateTime date) async {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    
+    List<DateTime> assignedDates = List.from(task.assignedDates);
+    assignedDates.removeWhere((d) => 
+      d.year == normalizedDate.year && 
+      d.month == normalizedDate.month && 
+      d.day == normalizedDate.day
+    );
+    
+    final updatedTask = task.copyWith(assignedDates: assignedDates);
+    await updateTask(updatedTask);
+  }
 }
-
