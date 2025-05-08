@@ -7,35 +7,37 @@ environment:
   sdk: ^3.7.2
 
 dependencies:
-  # Flutter core
   flutter:
     sdk: flutter
-
-  # Localizations (incluye intl 0.19.0)
   flutter_localizations:
     sdk: flutter
-
-  # UI
   cupertino_icons: ^1.0.8
   table_calendar: ^3.0.9
-
-  # Internacionalización
   intl: ^0.19.0
-
-  # Firebase
   firebase_core: ^2.32.0
   firebase_auth: ^4.17.4
   cloud_firestore: ^4.15.7
   firebase_storage: ^11.7.7
   image_picker: ^1.1.0
-
-  # Notificaciones locales
   flutter_local_notifications: ^17.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+
+# Esta es la configuración correcta para flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/primeraversiofinallogo.png"
+  adaptive_icon_background: "#4AFA9F"  # Color del fondo verde que coincide con tu logo
+  adaptive_icon_foreground: "assets/logosinfondoreducido4.png"
+  # Añadimos estos parámetros para ajustar el tamaño y posición
+  adaptive_icon_foreground_scale_factor: 0.7  # Reduce el tamaño al 70%
+  remove_alpha_ios: true
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
