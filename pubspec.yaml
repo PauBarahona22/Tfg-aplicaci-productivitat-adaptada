@@ -20,6 +20,8 @@ dependencies:
   firebase_storage: ^11.7.7
   image_picker: ^1.1.0
   flutter_local_notifications: ^17.0.0
+ 
+
 
 dev_dependencies:
   flutter_test:
@@ -27,15 +29,14 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
 
-# Esta es la configuración correcta para flutter_launcher_icons
+
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/primeraversiofinallogo.png"
-  adaptive_icon_background: "#4AFA9F"  # Color del fondo verde que coincide con tu logo
+  adaptive_icon_background: "#4AFA9F"  
   adaptive_icon_foreground: "assets/logosinfondoreducido4.png"
-  # Añadimos estos parámetros para ajustar el tamaño y posición
-  adaptive_icon_foreground_scale_factor: 0.7  # Reduce el tamaño al 70%
+  adaptive_icon_foreground_scale_factor: 0.7  
   remove_alpha_ios: true
   min_sdk_android: 21
 

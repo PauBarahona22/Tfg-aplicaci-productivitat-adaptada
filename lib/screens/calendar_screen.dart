@@ -145,8 +145,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return 'DUES SETMANES';
       case CalendarFormat.week:
         return 'SETMANA';
-      default:
-        return 'MES';
+      
+      
     }
   }
   

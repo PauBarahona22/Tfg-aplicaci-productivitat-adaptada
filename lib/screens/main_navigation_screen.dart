@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../database/reminder_service.dart';
 import 'task_list_screen.dart';
 import 'calendar_screen.dart';
 import 'home_screen.dart';
@@ -15,6 +18,71 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final PageController _pageController = PageController(initialPage: 2);
   int _selectedIndex = 2;
+  final ReminderService _reminderService = ReminderService();
+
+  @override
+  void initState() {
+    super.initState();
+    _setupNotificationActions();
+  }
+
+  // Configurar acciones para las notificaciones
+  Future<void> _setupNotificationActions() async {
+    await _reminderService.initialize();
+    
+    // Configurar acciones cuando la app está abierta
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+        FlutterLocalNotificationsPlugin();
+
+    const AndroidInitializationSettings androidSettings = 
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings iosSettings = 
+        DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
+
+    flutterLocalNotificationsPlugin.initialize(
+      const InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      ),
+      onDidReceiveNotificationResponse: (NotificationResponse details) {
+        _handleNotificationAction(details);
+      },
+    );
+
+    // Nota: Ya no intentamos solicitar permisos aquí, confiamos en el AndroidManifest.xml
+  }
+
+  // Manejar acciones de las notificaciones
+  void _handleNotificationAction(NotificationResponse details) async {
+    if (details.payload == null) return;
+
+    final String reminderId = details.payload!;
+    
+    switch (details.actionId) {
+      case 'complete':
+        await _reminderService.completeReminderFromNotification(reminderId);
+        break;
+      case 'delay_15':
+        await _reminderService.delayReminderFromNotification(reminderId, 15);
+        break;
+      case 'delay_60':
+        await _reminderService.delayReminderFromNotification(reminderId, 60);
+        break;
+      default:
+        // Cuando se toca la notificación sin acción específica
+        _navigateToRemindersTab();
+        break;
+    }
+  }
+
+  // Navegar a la pestaña de recordatorios
+  void _navigateToRemindersTab() {
+    _onItemTapped(3); // Índice de la tab de recordatorios
+  }
 
   void _onPageChanged(int index) {
     setState(() {
