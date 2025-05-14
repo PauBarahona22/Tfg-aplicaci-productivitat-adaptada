@@ -9,14 +9,12 @@ class ReminderService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
-
   bool _isInitialized = false;
 
-  /// Inicializa zona horaria, canal y permisos de notificación.
+  /// Inicializa timezone, canal y permisos.
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // 1) Timezone
     tz_data.initializeTimeZones();
     try {
       tz.setLocalLocation(tz.getLocation('Europe/Madrid'));
@@ -24,7 +22,6 @@ class ReminderService {
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
 
-    // 2) Inicialización del plugin
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -36,23 +33,17 @@ class ReminderService {
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
-    // 3) Crear canal Android
     if (Platform.isAndroid) {
       const channel = AndroidNotificationChannel(
         'reminders_channel',
         'Recordatoris',
         description: 'Notificacions dels recordatoris',
         importance: Importance.max,
-        playSound: true,
-        enableVibration: true,
-        enableLights: true,
       );
       await _localNotifications
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
-
-      // 4) PEDIR PERMISO EN ANDROID 13+
       await _localNotifications
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
@@ -62,12 +53,11 @@ class ReminderService {
     _isInitialized = true;
   }
 
-  /// Handler al pulsar la notificación
-  void _onNotificationTapped(NotificationResponse response) {
-    print('Notificación tocada, payload: ${response.payload}');
+  void _onNotificationTapped(NotificationResponse details) {
+    print('🔔 Notificación tocada, payload=${details.payload}');
+    
   }
 
-  /// Devuelve un stream de recordatorios del usuario
   Stream<List<ReminderModel>> streamReminders(String ownerId) {
     return _firestore
         .collection('reminders')
@@ -78,13 +68,12 @@ class ReminderService {
   }
 
   Future<String> addReminder(ReminderModel reminder) async {
-    final docRef =
-        await _firestore.collection('reminders').add(reminder.toMap());
-    final withId = reminder.copyWith(id: docRef.id);
+    final doc = await _firestore.collection('reminders').add(reminder.toMap());
+    final withId = reminder.copyWith(id: doc.id);
     if (withId.notificationsEnabled && withId.reminderTime != null) {
       await scheduleNotification(withId);
     }
-    return docRef.id;
+    return doc.id;
   }
 
   Future<void> updateReminder(ReminderModel reminder) async {
@@ -103,7 +92,6 @@ class ReminderService {
     await cancelNotification(id.hashCode);
   }
 
-  /// Programa la notificación (o la muestra inmediatamente si la hora ya pasó)
   Future<void> scheduleNotification(ReminderModel reminder) async {
     await initialize();
     if (!reminder.notificationsEnabled || reminder.reminderTime == null) return;
@@ -112,50 +100,72 @@ class ReminderService {
     final now = tz.TZDateTime.now(tz.local);
     final scheduled = tz.TZDateTime.from(reminder.reminderTime!, tz.local);
 
+    print('🕒 now=$now  scheduled=$scheduled');
+    if (scheduled.isBefore(now)) {
+      print('⚠️  Fecha pasada, no programada.');
+      return;
+    }
+
+    final androidDetails = AndroidNotificationDetails(
+      'reminders_channel',
+      'Recordatoris',
+      channelDescription: 'Notificacions dels recordatoris',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+    final iosDetails = const DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
     final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        'reminders_channel',
-        'Recordatoris',
-        channelDescription: 'Notificacions dels recordatoris',
-        importance: Importance.max,
-        priority: Priority.high,
-        fullScreenIntent: true,
-        category: AndroidNotificationCategory.alarm,
-      ),
-      iOS: const DarwinNotificationDetails(
-        presentAlert: true, presentBadge: true, presentSound: true,
-      ),
+      android: androidDetails,
+      iOS: iosDetails,
     );
 
-    if (scheduled.isBefore(now)) {
-      // Si la hora ya pasó, muéstrala inmediatamente
-      await _localNotifications.show(
-        id,
-        'Recordatori',
-        reminder.title,
-        details,
-        payload: reminder.id,
-      );
-    } else {
-      await _localNotifications.zonedSchedule(
-        id,
-        'Recordatori',
-        reminder.title,
-        scheduled,
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents:
-            _mapPatternToDateTimeComponents(reminder.repetitionPattern),
-        payload: reminder.id,
-      );
-    }
+    await _localNotifications.zonedSchedule(
+      id,
+      'Recordatori',
+      reminder.title,
+      scheduled,
+      details,
+      androidAllowWhileIdle: true,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents:
+          _mapPatternToDateTimeComponents(reminder.repetitionPattern),
+      payload: reminder.id,
+    );
+    print('✅ Programada notificación (ID $id) para $scheduled');
   }
 
-  /// Mapea el patrón de repetición a DateTimeComponents
-  DateTimeComponents? _mapPatternToDateTimeComponents(String pattern) {
-    switch (pattern) {
+  Future<void> cancelNotification(int id) async {
+    await initialize();
+    await _localNotifications.cancel(id);
+    print('🗑  Cancelada notificación ID $id');
+  }
+
+  Future<void> completeReminderFromNotification(String reminderId) async {
+    final snap =
+        await _firestore.collection('reminders').doc(reminderId).get();
+    if (!snap.exists) return;
+    final r = ReminderModel.fromDoc(snap);
+    await updateReminder(r.copyWith(isDone: true));
+  }
+
+  Future<void> delayReminderFromNotification(
+      String reminderId, int minutes) async {
+    final snap =
+        await _firestore.collection('reminders').doc(reminderId).get();
+    if (!snap.exists) return;
+    final r = ReminderModel.fromDoc(snap);
+    if (r.reminderTime == null) return;
+    final newTime = r.reminderTime!.add(Duration(minutes: minutes));
+    await updateReminder(r.copyWith(reminderTime: newTime));
+  }
+
+  DateTimeComponents? _mapPatternToDateTimeComponents(String p) {
+    switch (p) {
       case 'Diàriament':
         return DateTimeComponents.time;
       case 'Setmanalment':
@@ -166,29 +176,5 @@ class ReminderService {
         return null;
     }
   }
-
-  Future<void> cancelNotification(int id) async {
-    await initialize();
-    await _localNotifications.cancel(id);
-  }
-
-  /// Completar recordatorio desde notificación
-  Future<void> completeReminderFromNotification(String reminderId) async {
-    final docSnap = await _firestore.collection('reminders').doc(reminderId).get();
-    if (!docSnap.exists) return;
-    final reminder = ReminderModel.fromDoc(docSnap);
-    final updated = reminder.copyWith(isDone: true);
-    await updateReminder(updated);
-  }
-
-  /// Aplazar recordatorio desde notificación
-  Future<void> delayReminderFromNotification(String reminderId, int minutes) async {
-    final docSnap = await _firestore.collection('reminders').doc(reminderId).get();
-    if (!docSnap.exists) return;
-    final reminder = ReminderModel.fromDoc(docSnap);
-    if (reminder.reminderTime == null) return;
-    final newTime = reminder.reminderTime!.add(Duration(minutes: minutes));
-    final updated = reminder.copyWith(reminderTime: newTime);
-    await updateReminder(updated);
-  }
 }
+
