@@ -179,6 +179,43 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
     if (sel != null) setState(() => _repetitionPattern = sel);
   }
 
+  // Función para alternar el estado completado del recordatorio
+  void _toggleDone() {
+    setState(() => _isDone = !_isDone);
+    // Si no es un recordatorio nuevo, guardar el cambio inmediatamente
+    if (widget.reminder != null) {
+      _saveQuiet();
+    }
+  }
+
+  // Guardar cambios sin mostrar mensajes
+  Future<void> _saveQuiet() async {
+    if (_titleCtrl.text.trim().isEmpty) return;
+    
+    final isNew = widget.reminder == null;
+    final model = ReminderModel(
+      id: isNew ? '' : widget.reminder!.id,
+      ownerId: _uid,
+      title: _titleCtrl.text.trim(),
+      createdAt: _createdAt,
+      dueDate: _dueDate,
+      reminderTime: _reminderTime,
+      isDone: _isDone,
+      notificationsEnabled: _notificationsEnabled,
+      taskId: _taskId,
+      repetitionPattern: _repetitionPattern,
+      assignedDates: [],
+    );
+
+    try {
+      if (!isNew) {
+        await _reminderService.updateReminder(model);
+      }
+    } catch (e) {
+      print('Error al guardar: $e');
+    }
+  }
+
   Future<void> _save() async {
     if (_titleCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context)
@@ -241,12 +278,51 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
     }
   }
 
+  // Obtener el estado actual del recordatorio basado en la fecha de vencimiento
+  String get _reminderStatus {
+    if (_isDone) return 'Completat';
+    if (_dueDate == null) return 'Sense data de venciment';
+    
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDate = DateTime(_dueDate!.year, _dueDate!.month, _dueDate!.day);
+    
+    if (dueDate.isBefore(today)) {
+      return 'Vençut';
+    } else {
+      return 'Vigent';
+    }
+  }
+
+  // Obtener el color para el estado del recordatorio
+  Color get _statusColor {
+    switch (_reminderStatus) {
+      case 'Completat':
+        return Colors.green;
+      case 'Vençut':
+        return Colors.red;
+      case 'Vigent':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isNew = widget.reminder == null;
     return Scaffold(
       appBar: AppBar(
         title: Text(isNew ? 'Nou Recordatori' : 'Editar Recordatori'),
+        actions: [
+          // Botón para marcar como completado
+          if (!isNew)
+            IconButton(
+              icon: Icon(_isDone ? Icons.check_circle : Icons.radio_button_unchecked, size: 28),
+              color: _isDone ? Colors.green : Colors.grey,
+              onPressed: _toggleDone,
+            ),
+        ],
       ),
       body: _isSaving
           ? const Center(child: CircularProgressIndicator())
@@ -287,11 +363,28 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
                     subtitle: Text(_selectedTask?.title ?? '—'),
                     trailing: IconButton(icon: const Icon(Icons.checklist), onPressed: _selectTask),
                   ),
+                  // Estado del recordatorio (Vencido/Vigente)
+                  if (!isNew || _dueDate != null)
+                    ListTile(
+                      title: const Text('Estat'),
+                      subtitle: Text(
+                        _reminderStatus,
+                        style: TextStyle(
+                          color: _statusColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      leading: Icon(
+                        _isDone ? Icons.check_circle : 
+                        (_reminderStatus == 'Vençut' ? Icons.warning : Icons.info),
+                        color: _statusColor,
+                      ),
+                    ),
                 ],
               ),
             ),
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Row(
           children: [
             Expanded(
@@ -303,9 +396,14 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
             if (!isNew) const SizedBox(width: 16),
             if (!isNew)
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  side: const BorderSide(color: Colors.grey),
+                  minimumSize: const Size(56, 56),
+                ),
                 onPressed: _confirmDelete,
-                child: const Icon(Icons.delete, color: Colors.white),
+                child: const Icon(Icons.delete),
               ),
           ],
         ),

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:flutter/material.dart';
 import '../models/reminder_model.dart';
 
 class ReminderService {
@@ -55,7 +56,89 @@ class ReminderService {
 
   void _onNotificationTapped(NotificationResponse details) {
     print('🔔 Notificación tocada, payload=${details.payload}');
+    // Cuando se toca una notificación, verifica si necesita programar la siguiente repetición
+    if (details.payload != null) {
+      _checkAndScheduleNextRepetition(details.payload!);
+    }
+  }
+
+  /// Verifica y programa la siguiente repetición de un recordatorio recurrente
+  Future<void> _checkAndScheduleNextRepetition(String reminderId) async {
+    final snap = await _firestore.collection('reminders').doc(reminderId).get();
+    if (!snap.exists) return;
     
+    final reminder = ReminderModel.fromDoc(snap);
+    if (reminder.repetitionPattern == 'No repetir') return;
+    
+    // Solo verifica repeticiones para notificaciones activas
+    if (reminder.notificationsEnabled && reminder.reminderTime != null) {
+      // Garantiza que se programe la próxima repetición
+      await _scheduleNextRepetition(reminder);
+    }
+  }
+
+  /// Programa la siguiente repetición basada en el patrón
+  Future<void> _scheduleNextRepetition(ReminderModel reminder) async {
+    if (reminder.reminderTime == null) return;
+    
+    DateTime nextTime;
+    final now = DateTime.now();
+    final currentTime = reminder.reminderTime!;
+    
+    switch (reminder.repetitionPattern) {
+      case 'Diàriament':
+        // Siguiente día, misma hora
+        nextTime = DateTime(
+          now.year, 
+          now.month, 
+          now.day + 1,
+          currentTime.hour, 
+          currentTime.minute,
+        );
+        break;
+      case 'Setmanalment':
+        // Siguiente semana, mismo día de la semana
+        nextTime = DateTime(
+          now.year, 
+          now.month, 
+          now.day + 7,
+          currentTime.hour, 
+          currentTime.minute,
+        );
+        break;
+      case 'Mensualment':
+        // Siguiente mes, mismo día del mes (con ajuste si necesario)
+        var nextMonth = now.month + 1;
+        var nextYear = now.year;
+        if (nextMonth > 12) {
+          nextMonth = 1;
+          nextYear++;
+        }
+        
+        // Ajustar el día si el mes siguiente no tiene tantos días
+        var day = currentTime.day;
+        int daysInNextMonth = DateTime(nextYear, nextMonth + 1, 0).day;
+        if (day > daysInNextMonth) {
+          day = daysInNextMonth;
+        }
+        
+        nextTime = DateTime(
+          nextYear, 
+          nextMonth, 
+          day,
+          currentTime.hour, 
+          currentTime.minute,
+        );
+        break;
+      default:
+        return; // Patrón no reconocido
+    }
+    
+    // Actualizar el recordatorio con el nuevo tiempo
+    final updatedReminder = reminder.copyWith(reminderTime: nextTime);
+    await updateReminder(updatedReminder);
+    
+    print('🔄 Próxima repetición programada: $nextTime');
   }
 
   Stream<List<ReminderModel>> streamReminders(String ownerId) {
@@ -81,7 +164,11 @@ class ReminderService {
         .collection('reminders')
         .doc(reminder.id)
         .update(reminder.toMap());
+    
+    // Cancelar cualquier notificación previa
     await cancelNotification(reminder.id.hashCode);
+    
+    // Solo programar nueva notificación si está habilitada y tiene tiempo
     if (reminder.notificationsEnabled && reminder.reminderTime != null) {
       await scheduleNotification(reminder);
     }
@@ -95,34 +182,45 @@ class ReminderService {
   Future<void> scheduleNotification(ReminderModel reminder) async {
     await initialize();
     if (!reminder.notificationsEnabled || reminder.reminderTime == null) return;
-
     final id = reminder.id.hashCode;
     final now = tz.TZDateTime.now(tz.local);
     final scheduled = tz.TZDateTime.from(reminder.reminderTime!, tz.local);
-
+    
     print('🕒 now=$now  scheduled=$scheduled');
     if (scheduled.isBefore(now)) {
       print('⚠️  Fecha pasada, no programada.');
       return;
     }
-
+    // Definir acciones para Android
+    final List<AndroidNotificationAction> actions = [
+      const AndroidNotificationAction('complete', 'Completar'),
+      const AndroidNotificationAction('delay_15', 'Ajornar 15 min'),
+      const AndroidNotificationAction('delay_60', 'Ajornar 1 hora'),
+    ];
     final androidDetails = AndroidNotificationDetails(
       'reminders_channel',
       'Recordatoris',
       channelDescription: 'Notificacions dels recordatoris',
       importance: Importance.max,
       priority: Priority.high,
+      actions: actions,
+      icon: 'notification_icon',
+      color: const Color(0xFF5DC1B9),
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.alarm,
     );
+    
     final iosDetails = const DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
+    
     final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
-
+    
     await _localNotifications.zonedSchedule(
       id,
       'Recordatori',
@@ -130,6 +228,7 @@ class ReminderService {
       scheduled,
       details,
       androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents:
@@ -150,19 +249,87 @@ class ReminderService {
         await _firestore.collection('reminders').doc(reminderId).get();
     if (!snap.exists) return;
     final r = ReminderModel.fromDoc(snap);
+    
+    // Marcar como completado
     await updateReminder(r.copyWith(isDone: true));
+    
+    // Si era un recordatorio recurrente, programar la próxima ocurrencia
+    if (r.repetitionPattern != 'No repetir') {
+      await _checkAndScheduleNextRepetition(reminderId);
+    }
   }
 
-  Future<void> delayReminderFromNotification(
-      String reminderId, int minutes) async {
-    final snap =
-        await _firestore.collection('reminders').doc(reminderId).get();
-    if (!snap.exists) return;
-    final r = ReminderModel.fromDoc(snap);
-    if (r.reminderTime == null) return;
-    final newTime = r.reminderTime!.add(Duration(minutes: minutes));
-    await updateReminder(r.copyWith(reminderTime: newTime));
+  Future<void> delayReminderFromNotification(String reminderId, int minutes) async {
+  final snap = await _firestore.collection('reminders').doc(reminderId).get();
+  if (!snap.exists) return;
+  final r = ReminderModel.fromDoc(snap);
+  
+  // Crear un nuevo tiempo basado en el momento actual + minutos
+  final newTime = DateTime.now().add(Duration(minutes: minutes));
+  print('🕘 Programando nueva notificación para: $newTime');
+  
+  try {
+    // Cancelar la notificación anterior para este ID
+    await cancelNotification(r.id.hashCode);
+    
+    // Programar una notificación directamente, sin pasar por updateReminder
+    final id = r.id.hashCode;
+    final scheduled = tz.TZDateTime.from(newTime, tz.local);
+    
+    final List<AndroidNotificationAction> actions = [
+      const AndroidNotificationAction('complete', 'Completar'),
+      const AndroidNotificationAction('delay_15', 'Ajornar 15 min'),
+      const AndroidNotificationAction('delay_60', 'Ajornar 1 hora'),
+    ];
+    
+    final androidDetails = AndroidNotificationDetails(
+      'reminders_channel',
+      'Recordatoris',
+      channelDescription: 'Notificacions dels recordatoris',
+      importance: Importance.max,
+      priority: Priority.high,
+      actions: actions,
+      icon: 'notification_icon',
+      color: const Color(0xFF5DC1B9),
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.alarm,
+    );
+    
+    final iosDetails = const DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+    
+    await _localNotifications.zonedSchedule(
+      id,
+      'Recordatori (ajornat)',
+      r.title,
+      scheduled,
+      details,
+      androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: r.id,
+    );
+    
+    print('✅ Notificación aplazada programada exitosamente para $scheduled');
+    
+    // Actualizar el recordatorio en Firestore (opcional)
+    await _firestore.collection('reminders').doc(r.id).update({
+      'reminderTime': newTime.toIso8601String()
+    });
+    
+  } catch (e) {
+    print('⚠️ Error al programar la notificación aplazada: $e');
   }
+}
 
   DateTimeComponents? _mapPatternToDateTimeComponents(String p) {
     switch (p) {
@@ -177,4 +344,3 @@ class ReminderService {
     }
   }
 }
-
