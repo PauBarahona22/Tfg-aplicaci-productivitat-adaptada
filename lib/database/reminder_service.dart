@@ -191,19 +191,14 @@ class ReminderService {
       print('⚠️  Fecha pasada, no programada.');
       return;
     }
-    // Definir acciones para Android
-    final List<AndroidNotificationAction> actions = [
-      const AndroidNotificationAction('complete', 'Completar'),
-      const AndroidNotificationAction('delay_15', 'Ajornar 15 min'),
-      const AndroidNotificationAction('delay_60', 'Ajornar 1 hora'),
-    ];
+
+    // Notificación simplificada sin acciones
     final androidDetails = AndroidNotificationDetails(
       'reminders_channel',
       'Recordatoris',
       channelDescription: 'Notificacions dels recordatoris',
       importance: Importance.max,
       priority: Priority.high,
-      actions: actions,
       icon: 'notification_icon',
       color: const Color(0xFF5DC1B9),
       fullScreenIntent: true,
@@ -260,76 +255,69 @@ class ReminderService {
   }
 
   Future<void> delayReminderFromNotification(String reminderId, int minutes) async {
-  final snap = await _firestore.collection('reminders').doc(reminderId).get();
-  if (!snap.exists) return;
-  final r = ReminderModel.fromDoc(snap);
-  
-  // Crear un nuevo tiempo basado en el momento actual + minutos
-  final newTime = DateTime.now().add(Duration(minutes: minutes));
-  print('🕘 Programando nueva notificación para: $newTime');
-  
-  try {
-    // Cancelar la notificación anterior para este ID
-    await cancelNotification(r.id.hashCode);
+    final snap = await _firestore.collection('reminders').doc(reminderId).get();
+    if (!snap.exists) return;
+    final r = ReminderModel.fromDoc(snap);
     
-    // Programar una notificación directamente, sin pasar por updateReminder
-    final id = r.id.hashCode;
-    final scheduled = tz.TZDateTime.from(newTime, tz.local);
+    // Crear un nuevo tiempo basado en el momento actual + minutos
+    final newTime = DateTime.now().add(Duration(minutes: minutes));
+    print('🕘 Programando nueva notificación para: $newTime');
     
-    final List<AndroidNotificationAction> actions = [
-      const AndroidNotificationAction('complete', 'Completar'),
-      const AndroidNotificationAction('delay_15', 'Ajornar 15 min'),
-      const AndroidNotificationAction('delay_60', 'Ajornar 1 hora'),
-    ];
-    
-    final androidDetails = AndroidNotificationDetails(
-      'reminders_channel',
-      'Recordatoris',
-      channelDescription: 'Notificacions dels recordatoris',
-      importance: Importance.max,
-      priority: Priority.high,
-      actions: actions,
-      icon: 'notification_icon',
-      color: const Color(0xFF5DC1B9),
-      fullScreenIntent: true,
-      category: AndroidNotificationCategory.alarm,
-    );
-    
-    final iosDetails = const DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-    
-    final details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-    
-    await _localNotifications.zonedSchedule(
-      id,
-      'Recordatori (ajornat)',
-      r.title,
-      scheduled,
-      details,
-      androidAllowWhileIdle: true,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: r.id,
-    );
-    
-    print('✅ Notificación aplazada programada exitosamente para $scheduled');
-    
-    // Actualizar el recordatorio en Firestore (opcional)
-    await _firestore.collection('reminders').doc(r.id).update({
-      'reminderTime': newTime.toIso8601String()
-    });
-    
-  } catch (e) {
-    print('⚠️ Error al programar la notificación aplazada: $e');
+    try {
+      // Cancelar la notificación anterior para este ID
+      await cancelNotification(r.id.hashCode);
+      
+      // Programar una notificación simplificada
+      final id = r.id.hashCode;
+      final scheduled = tz.TZDateTime.from(newTime, tz.local);
+      
+      final androidDetails = AndroidNotificationDetails(
+        'reminders_channel',
+        'Recordatoris',
+        channelDescription: 'Notificacions dels recordatoris',
+        importance: Importance.max,
+        priority: Priority.high,
+        icon: 'notification_icon',
+        color: const Color(0xFF5DC1B9),
+        fullScreenIntent: true,
+        category: AndroidNotificationCategory.alarm,
+      );
+      
+      final iosDetails = const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      
+      final details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+      
+      await _localNotifications.zonedSchedule(
+        id,
+        'Recordatori (ajornat)',
+        r.title,
+        scheduled,
+        details,
+        androidAllowWhileIdle: true,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: r.id,
+      );
+      
+      print('✅ Notificación aplazada programada exitosamente para $scheduled');
+      
+      // Actualizar el recordatorio en Firestore (opcional)
+      await _firestore.collection('reminders').doc(r.id).update({
+        'reminderTime': newTime.toIso8601String()
+      });
+      
+    } catch (e) {
+      print('⚠️ Error al programar la notificación aplazada: $e');
+    }
   }
-}
 
   DateTimeComponents? _mapPatternToDateTimeComponents(String p) {
     switch (p) {
@@ -342,5 +330,38 @@ class ReminderService {
       default:
         return null;
     }
+  }
+
+  Future<void> assignReminderToCalendar(ReminderModel reminder, DateTime date) async {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    
+    List<DateTime> assignedDates = List.from(reminder.assignedDates);
+    
+    bool alreadyAssigned = assignedDates.any((d) => 
+      d.year == normalizedDate.year && 
+      d.month == normalizedDate.month && 
+      d.day == normalizedDate.day
+    );
+    
+    if (!alreadyAssigned) {
+      assignedDates.add(normalizedDate);
+      
+      final updatedReminder = reminder.copyWith(assignedDates: assignedDates);
+      await updateReminder(updatedReminder);
+    }
+  }
+  
+  Future<void> removeAssignedDate(ReminderModel reminder, DateTime date) async {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    
+    List<DateTime> assignedDates = List.from(reminder.assignedDates);
+    assignedDates.removeWhere((d) => 
+      d.year == normalizedDate.year && 
+      d.month == normalizedDate.month && 
+      d.day == normalizedDate.day
+    );
+    
+    final updatedReminder = reminder.copyWith(assignedDates: assignedDates);
+    await updateReminder(updatedReminder);
   }
 }

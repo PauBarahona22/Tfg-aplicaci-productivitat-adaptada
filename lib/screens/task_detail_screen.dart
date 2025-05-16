@@ -21,6 +21,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final _taskService = TaskService();
   final _titleCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+   bool _isSaving = false;
 
   static const List<String> _allTypes = [
     'General',
@@ -193,6 +194,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       return;
     }
 
+    setState(() => _isSaving = true);
     final isNew = widget.task == null;
     final model = TaskModel(
       id: isNew ? '' : widget.task!.id,
@@ -206,19 +208,33 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       type: _type,
       remind: _remind,
       subtasks: _subtasks,
-      assignedDates: _assignedDates, // Asegúrate que TaskModel acepta este campo
+      assignedDates: _assignedDates,
     );
 
-    if (isNew) {
-      await _taskService.addTask(model);
-    } else {
-      await _taskService.updateTask(model.copyWith(id: widget.task!.id));
-    }
-
-    if (!quiet) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Canvis desats')),
-      );
+    try {
+      if (isNew) {
+        await _taskService.addTask(model);
+        // <-- Al crear, volvemos automáticamente a la lista:
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tasca creada correctament')),
+        );
+      } else {
+        await _taskService.updateTask(model.copyWith(id: widget.task!.id));
+        if (!quiet) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Canvis desats')),
+          );
+        }
+      }
+    } catch (e) {
+      if (!quiet) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 

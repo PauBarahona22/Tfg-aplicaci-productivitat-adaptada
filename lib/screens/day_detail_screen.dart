@@ -4,6 +4,9 @@ import '../models/task_model.dart';
 import '../database/task_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'task_detail_screen.dart';
+import '../models/reminder_model.dart';
+import '../database/reminder_service.dart';
+import 'reminder_detail_screen.dart';
 class DayDetailScreen extends StatefulWidget {
   final DateTime selectedDay;
   
@@ -16,6 +19,7 @@ class DayDetailScreen extends StatefulWidget {
 }
 class _DayDetailScreenState extends State<DayDetailScreen> {
   final TaskService _taskService = TaskService();
+  final ReminderService _reminderService = ReminderService();
   final _uid = FirebaseAuth.instance.currentUser!.uid;
   
   @override
@@ -30,48 +34,140 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
-        children: [
-          // Lista de tareas del día
-          Expanded(
-            child: StreamBuilder<List<TaskModel>>(
-              stream: _taskService.streamTasks(_uid),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+      // Botón de añadir como FloatingActionButton
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            builder: (context) => Wrap(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.checklist),
+                  title: const Text('Nova Tasca'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TaskDetailScreen(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.notifications),
+                  title: const Text('Nou Recordatori'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ReminderDetailScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
+      body: StreamBuilder<List<TaskModel>>(
+        stream: _taskService.streamTasks(_uid),
+        builder: (context, taskSnapshot) {
+          if (taskSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          if (taskSnapshot.hasError) {
+            return Center(child: Text('Error: ${taskSnapshot.error}'));
+          }
+          
+          // Filtramos las tareas para mostrar solo las del día seleccionado
+          final List<TaskModel> dayTasks = [];
+          if (taskSnapshot.hasData && taskSnapshot.data!.isNotEmpty) {
+            dayTasks.addAll(taskSnapshot.data!.where((task) {
+              final selectedDate = DateTime(
+                widget.selectedDay.year,
+                widget.selectedDay.month,
+                widget.selectedDay.day,
+              );
+              
+              // Verificar si es fecha de vencimiento
+              if (task.dueDate != null) {
+                final taskDate = DateTime(
+                  task.dueDate!.year,
+                  task.dueDate!.month,
+                  task.dueDate!.day,
+                );
                 
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                if (taskDate.isAtSameMomentAs(selectedDate)) {
+                  return true;
                 }
-                
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('No hi ha tasques per aquest dia'));
-                }
-                
-                // Filtramos las tareas para mostrar solo las del día seleccionado
-                final dayTasks = snapshot.data!.where((task) {
+              }
+              
+              // Verificar si está en fechas asignadas
+              return task.assignedDates.any((date) {
+                final assignedDate = DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                );
+                return assignedDate.isAtSameMomentAs(selectedDate);
+              });
+            }));
+          }
+          
+          return StreamBuilder<List<ReminderModel>>(
+            stream: _reminderService.streamReminders(_uid),
+            builder: (context, reminderSnapshot) {
+              if (reminderSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              
+              if (reminderSnapshot.hasError) {
+                return Center(child: Text('Error: ${reminderSnapshot.error}'));
+              }
+              
+              // Filtramos los recordatorios para mostrar solo los del día seleccionado
+              final List<ReminderModel> dayReminders = [];
+              if (reminderSnapshot.hasData && reminderSnapshot.data!.isNotEmpty) {
+                dayReminders.addAll(reminderSnapshot.data!.where((reminder) {
                   final selectedDate = DateTime(
                     widget.selectedDay.year,
                     widget.selectedDay.month,
                     widget.selectedDay.day,
                   );
                   
-                  // Verificar si es fecha de vencimiento
-                  if (task.dueDate != null) {
-                    final taskDate = DateTime(
-                      task.dueDate!.year,
-                      task.dueDate!.month,
-                      task.dueDate!.day,
+                  // Verificar si es tiempo de recordatorio
+                  if (reminder.reminderTime != null) {
+                    final reminderDate = DateTime(
+                      reminder.reminderTime!.year,
+                      reminder.reminderTime!.month,
+                      reminder.reminderTime!.day,
                     );
                     
-                    if (taskDate.isAtSameMomentAs(selectedDate)) {
+                    if (reminderDate.isAtSameMomentAs(selectedDate)) {
+                      return true;
+                    }
+                  }
+                  
+                  // Verificar si es fecha de vencimiento
+                  if (reminder.dueDate != null) {
+                    final dueDate = DateTime(
+                      reminder.dueDate!.year,
+                      reminder.dueDate!.month,
+                      reminder.dueDate!.day,
+                    );
+                    
+                    if (dueDate.isAtSameMomentAs(selectedDate)) {
                       return true;
                     }
                   }
                   
                   // Verificar si está en fechas asignadas
-                  return task.assignedDates.any((date) {
+                  return reminder.assignedDates.any((date) {
                     final assignedDate = DateTime(
                       date.year,
                       date.month,
@@ -79,17 +175,28 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                     );
                     return assignedDate.isAtSameMomentAs(selectedDate);
                   });
-                }).toList();
-                
-                if (dayTasks.isEmpty) {
-                  return const Center(child: Text('No hi ha tasques per aquest dia'));
-                }
-                
-                return ListView.builder(
-                  itemCount: dayTasks.length,
-                  itemBuilder: (context, index) {
-                    final task = dayTasks[index];
-                    return Card(
+                }));
+              }
+              
+              // Ahora construiremos una única ListView con todas las secciones
+              return ListView(
+                padding: const EdgeInsets.only(bottom: 80), // Espacio para el botón flotante
+                children: [
+                  // Sección de tareas
+                  const Padding(
+                    padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                    child: Text(
+                      'Tasques del dia:',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (dayTasks.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text('No hi ha tasques per aquest dia'),
+                    )
+                  else
+                    ...dayTasks.map((task) => Card(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 8.0,
                         vertical: 4.0,
@@ -117,58 +224,70 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                           );
                         },
                       ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          
-          // Secciones para futuros recordatorios y retos
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Recordatoris del dia:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text('Lliure'),
-                SizedBox(height: 8),
-                Text(
-                  'Reptes del dia:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text('Lliure'),
-              ],
-            ),
-          ),
-          
-          // Botón para añadir elemento
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FloatingActionButton(
-                  onPressed: () {
-                    // Por ahora, solo navegamos a la pantalla de nueva tarea con la fecha preseleccionada
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const TaskDetailScreen(),
+                    )).toList(),
+                  
+                  // Sección de recordatorios
+                  const Padding(
+                    padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                    child: Text(
+                      'Recordatoris del dia:',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (dayReminders.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text('No hi ha recordatoris per aquest dia'),
+                    )
+                  else
+                    ...dayReminders.map((reminder) => Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 4.0,
                       ),
-                    );
-                  },
-                  child: const Icon(Icons.add),
-                ),
-              ],
-            ),
-          ),
-        ],
+                      child: ListTile(
+                        title: Text(reminder.title),
+                        subtitle: Text(reminder.reminderTime != null 
+                            ? DateFormat('HH:mm', 'ca').format(reminder.reminderTime!)
+                            : 'Sense hora'),
+                        leading: Icon(
+                          reminder.isDone
+                            ? Icons.check_circle
+                            : Icons.notifications,
+                          color: reminder.isDone
+                            ? Colors.green
+                            : (reminder.dueDate != null && reminder.dueDate!.isBefore(DateTime.now())
+                                ? Colors.red
+                                : Colors.blue),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ReminderDetailScreen(reminder: reminder),
+                            ),
+                          );
+                        },
+                      ),
+                    )).toList(),
+                  
+                  // Sección de retos (futura implementación)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                    child: Text(
+                      'Reptes del dia:',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text('No hi ha reptes per aquest dia'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
