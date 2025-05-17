@@ -6,6 +6,7 @@ class UserModel {
   final String birthDate;
   final String city;
   final String bio;
+  final Map<String, int> medals;
 
   UserModel({
     required this.uid,
@@ -15,7 +16,18 @@ class UserModel {
     this.birthDate = '',
     this.city = '',
     this.bio = '',
-  });
+    Map<String, int>? medals,
+  }) : this.medals = medals ?? {
+        'General': 0,
+        'Acadèmica': 0,
+        'Deportiva': 0,
+        'Musical': 0,
+        'Familiar': 0,
+        'Laboral': 0,
+        'Artística': 0,
+        'Mascota': 0,
+        'Predefined': 0, // Medallas especiales para retos predefinidos
+      };
 
   Map<String, dynamic> toMap() {
     return {
@@ -26,10 +38,31 @@ class UserModel {
       'birthDate': birthDate,
       'city': city,
       'bio': bio,
+      'medals': medals,
     };
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
+    // Convertir el map de medallas si existe
+    Map<String, int> medalsMap = {
+      'General': 0,
+      'Acadèmica': 0,
+      'Deportiva': 0,
+      'Musical': 0,
+      'Familiar': 0,
+      'Laboral': 0,
+      'Artística': 0,
+      'Mascota': 0,
+      'Predefined': 0,
+    };
+    
+    if (map['medals'] != null) {
+      final medals = map['medals'] as Map<String, dynamic>;
+      medals.forEach((key, value) {
+        medalsMap[key] = (value as num).toInt();
+      });
+    }
+
     return UserModel(
       uid: map['uid'] ?? '',
       email: map['email'] ?? '',
@@ -38,6 +71,7 @@ class UserModel {
       birthDate: map['birthDate'] ?? '',
       city: map['city'] ?? '',
       bio: map['bio'] ?? '',
+      medals: medalsMap,
     );
   }
 }

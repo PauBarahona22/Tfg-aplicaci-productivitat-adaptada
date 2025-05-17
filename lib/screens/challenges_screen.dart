@@ -39,15 +39,16 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
   Future<void> _checkPredefinedChallenges() async {
     try {
+      // Obtener todos los retos actuales
       final challenges = await _challengeService
           .streamChallenges(_uid)
           .first
           .timeout(const Duration(seconds: 5));
-      final hasPre = challenges.any((c) => c.isPredefined);
-      if (!hasPre) {
-        await _challengeService.createPredefinedChallenges(_uid);
-      }
+      
+      // Verificar y crear los retos predefinidos que falten
+      await _challengeService.ensureAllPredefinedChallenges(_uid, challenges);
     } catch (e) {
+      // En caso de error, intentar nuevamente después de unos segundos
       Future.delayed(const Duration(seconds: 5), _checkPredefinedChallenges);
     }
   }
@@ -227,8 +228,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           // 3) Lista de retos bajo StreamBuilder
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () =>
-                  _challengeService.streamChallenges(_uid).first,
+              onRefresh: () => _challengeService.streamChallenges(_uid).first,
               child: StreamBuilder<List<ChallengeModel>>(
                 stream: _challengeService.streamChallenges(_uid),
                 builder: (context, snap) {
@@ -327,8 +327,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                   : c.isExpired
                       ? Colors.red
                       : Colors.blue,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
+              minHeight: 10,
+              borderRadius: BorderRadius.circular(8),
             ),
             const SizedBox(height: 4),
             Text(

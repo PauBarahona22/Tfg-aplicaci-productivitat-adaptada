@@ -7,6 +7,10 @@ import 'task_detail_screen.dart';
 import '../models/reminder_model.dart';
 import '../database/reminder_service.dart';
 import 'reminder_detail_screen.dart';
+import '../models/challenge_model.dart';
+import '../database/challenge_service.dart';
+import 'challenge_detail_screen.dart';
+
 class DayDetailScreen extends StatefulWidget {
   final DateTime selectedDay;
   
@@ -17,9 +21,11 @@ class DayDetailScreen extends StatefulWidget {
   @override
   State<DayDetailScreen> createState() => _DayDetailScreenState();
 }
+
 class _DayDetailScreenState extends State<DayDetailScreen> {
   final TaskService _taskService = TaskService();
   final ReminderService _reminderService = ReminderService();
+  final ChallengeService _challengeService = ChallengeService(); // Nuevo servicio
   final _uid = FirebaseAuth.instance.currentUser!.uid;
   
   @override
@@ -63,6 +69,20 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const ReminderDetailScreen(),
+                      ),
+                    );
+                  },
+                ),
+                // Opción para añadir un nuevo reto
+                ListTile(
+                  leading: const Icon(Icons.emoji_events),
+                  title: const Text('Nou Repte'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChallengeDetailScreen(),
                       ),
                     );
                   },
@@ -178,112 +198,192 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                 }));
               }
               
-              // Ahora construiremos una única ListView con todas las secciones
-              return ListView(
-                padding: const EdgeInsets.only(bottom: 80), // Espacio para el botón flotante
-                children: [
-                  // Sección de tareas
-                  const Padding(
-                    padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
-                    child: Text(
-                      'Tasques del dia:',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  if (dayTasks.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Text('No hi ha tasques per aquest dia'),
-                    )
-                  else
-                    ...dayTasks.map((task) => Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 8.0,
-                        vertical: 4.0,
-                      ),
-                      child: ListTile(
-                        title: Text(task.title),
-                        subtitle: Text(task.type),
-                        leading: CircleAvatar(
-                          backgroundColor: task.isDone
-                              ? Colors.green
-                              : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
-                                  ? Colors.red
-                                  : Colors.blue),
-                          radius: 12,
-                        ),
-                        trailing: task.dueDate != null
-                            ? Text(DateFormat('HH:mm', 'ca').format(task.dueDate!))
-                            : null,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TaskDetailScreen(task: task),
-                            ),
-                          );
-                        },
-                      ),
-                    )).toList(),
+              // Nuevo: StreamBuilder para retos
+              return StreamBuilder<List<ChallengeModel>>(
+                stream: _challengeService.streamChallenges(_uid),
+                builder: (context, challengeSnapshot) {
+                  if (challengeSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
                   
-                  // Sección de recordatorios
-                  const Padding(
-                    padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
-                    child: Text(
-                      'Recordatoris del dia:',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  if (dayReminders.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Text('No hi ha recordatoris per aquest dia'),
-                    )
-                  else
-                    ...dayReminders.map((reminder) => Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 8.0,
-                        vertical: 4.0,
-                      ),
-                      child: ListTile(
-                        title: Text(reminder.title),
-                        subtitle: Text(reminder.reminderTime != null 
-                            ? DateFormat('HH:mm', 'ca').format(reminder.reminderTime!)
-                            : 'Sense hora'),
-                        leading: Icon(
-                          reminder.isDone
-                            ? Icons.check_circle
-                            : Icons.notifications,
-                          color: reminder.isDone
-                            ? Colors.green
-                            : (reminder.dueDate != null && reminder.dueDate!.isBefore(DateTime.now())
-                                ? Colors.red
-                                : Colors.blue),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ReminderDetailScreen(reminder: reminder),
-                            ),
-                          );
-                        },
-                      ),
-                    )).toList(),
+                  if (challengeSnapshot.hasError) {
+                    return Center(child: Text('Error: ${challengeSnapshot.error}'));
+                  }
                   
-                  // Sección de retos (futura implementación)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
-                    child: Text(
-                      'Reptes del dia:',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text('No hi ha reptes per aquest dia'),
-                  ),
-                ],
+                  // Filtramos los retos para mostrar solo los del día seleccionado
+                  final List<ChallengeModel> dayChallenges = [];
+                  if (challengeSnapshot.hasData && challengeSnapshot.data!.isNotEmpty) {
+                    dayChallenges.addAll(challengeSnapshot.data!.where((challenge) {
+                      final selectedDate = DateTime(
+                        widget.selectedDay.year,
+                        widget.selectedDay.month,
+                        widget.selectedDay.day,
+                      );
+                      
+                      // Verificar si es fecha de vencimiento
+                      if (challenge.dueDate != null) {
+                        final dueDate = DateTime(
+                          challenge.dueDate!.year,
+                          challenge.dueDate!.month,
+                          challenge.dueDate!.day,
+                        );
+                        
+                        if (dueDate.isAtSameMomentAs(selectedDate)) {
+                          return true;
+                        }
+                      }
+                      
+                      return false;
+                    }));
+                  }
+                  
+                  // Ahora construiremos una única ListView con todas las secciones
+                  return ListView(
+                    padding: const EdgeInsets.only(bottom: 80), // Espacio para el botón flotante
+                    children: [
+                      // Sección de tareas
+                      const Padding(
+                        padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                        child: Text(
+                          'Tasques del dia:',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      if (dayTasks.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Text('No hi ha tasques per aquest dia'),
+                        )
+                      else
+                        ...dayTasks.map((task) => Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 8.0,
+                            vertical: 4.0,
+                          ),
+                          child: ListTile(
+                            title: Text(task.title),
+                            subtitle: Text(task.type),
+                            leading: CircleAvatar(
+                              backgroundColor: task.isDone
+                                  ? Colors.green
+                                  : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
+                                      ? Colors.red
+                                      : Colors.blue),
+                              radius: 12,
+                            ),
+                            trailing: task.dueDate != null
+                                ? Text(DateFormat('HH:mm', 'ca').format(task.dueDate!))
+                                : null,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TaskDetailScreen(task: task),
+                                ),
+                              );
+                            },
+                          ),
+                        )).toList(),
+                      
+                      // Sección de recordatorios
+                      const Padding(
+                        padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                        child: Text(
+                          'Recordatoris del dia:',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      if (dayReminders.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Text('No hi ha recordatoris per aquest dia'),
+                        )
+                      else
+                        ...dayReminders.map((reminder) => Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 8.0,
+                            vertical: 4.0,
+                          ),
+                          child: ListTile(
+                            title: Text(reminder.title),
+                            subtitle: Text(reminder.reminderTime != null 
+                                ? DateFormat('HH:mm', 'ca').format(reminder.reminderTime!)
+                                : 'Sense hora'),
+                            leading: Icon(
+                              reminder.isDone
+                                ? Icons.check_circle
+                                : Icons.notifications,
+                              color: reminder.isDone
+                                ? Colors.green
+                                : (reminder.dueDate != null && reminder.dueDate!.isBefore(DateTime.now())
+                                    ? Colors.red
+                                    : Colors.blue),
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ReminderDetailScreen(reminder: reminder),
+                                ),
+                              );
+                            },
+                          ),
+                        )).toList(),
+                      
+                      // Nueva sección de retos
+                      const Padding(
+                        padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                        child: Text(
+                          'Reptes del dia:',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      if (dayChallenges.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Text('No hi ha reptes per aquest dia'),
+                        )
+                      else
+                        ...dayChallenges.map((challenge) => Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 8.0,
+                            vertical: 4.0,
+                          ),
+                          child: ListTile(
+                            title: Text(challenge.title),
+                            subtitle: Text('${challenge.currentCount}/${challenge.targetCount}'),
+                            leading: CircleAvatar(
+                              backgroundColor: (challenge.isCompleted
+                                  ? Colors.green
+                                  : (challenge.dueDate != null && challenge.dueDate!.isBefore(DateTime.now())
+                                      ? Colors.red
+                                      : Colors.blue)).withOpacity(0.2),
+                              child: Icon(
+                                challenge.isPredefined ? Icons.auto_awesome : Icons.emoji_events,
+                                color: challenge.isCompleted
+                                  ? Colors.green
+                                  : (challenge.dueDate != null && challenge.dueDate!.isBefore(DateTime.now())
+                                      ? Colors.red
+                                      : Colors.blue),
+                                size: 16,
+                              ),
+                            ),
+                            trailing: challenge.dueDate != null
+                                ? Text(DateFormat('HH:mm', 'ca').format(challenge.dueDate!))
+                                : null,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChallengeDetailScreen(challenge: challenge),
+                                ),
+                              );
+                            },
+                          ),
+                        )).toList(),
+                    ],
+                  );
+                },
               );
             },
           );
