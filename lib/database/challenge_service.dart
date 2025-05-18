@@ -240,25 +240,68 @@ class ChallengeService {
   
   // Actualizar medallas del usuario cuando completa un reto
   Future<void> updateUserMedals(String userId, String category, bool isPredefined) async {
-    final userRef = _firestore.collection('users').doc(userId);
+  // Print logs for debugging
+  print('Updating medals for user: $userId, category: $category, isPredefined: $isPredefined');
+  
+  final userRef = _firestore.collection('users').doc(userId);
+  
+  try {
+    // First, get the current user data to check current medal values
     final userDoc = await userRef.get();
     
-    if (!userDoc.exists) return;
-    
-    // Crear mapa de actualizaciones
-    Map<String, dynamic> updates = {};
-    
-    // Actualizar contador de la categoría específica
-    updates['medals.$category'] = FieldValue.increment(1);
-    
-    // Si es un reto predefinido, también incrementar ese contador
-    if (isPredefined) {
-      updates['medals.Predefined'] = FieldValue.increment(1);
+    if (!userDoc.exists) {
+      print('User document does not exist');
+      return;
     }
     
-    // Aplicar las actualizaciones
-    await userRef.update(updates);
+    // Get the current medals map
+    Map<String, dynamic>? currentData = userDoc.data();
+    Map<String, dynamic> currentMedals = {};
+    
+    if (currentData != null && currentData.containsKey('medals')) {
+      currentMedals = Map<String, dynamic>.from(currentData['medals']);
+    } else {
+      // Initialize medals map if it doesn't exist
+      currentMedals = {
+        'General': 0,
+        'Acadèmica': 0,
+        'Deportiva': 0,
+        'Musical': 0,
+        'Familiar': 0,
+        'Laboral': 0,
+        'Artística': 0,
+        'Mascota': 0,
+        'Predefined': 0,
+      };
+    }
+    
+    // Update the specific category
+    int currentCount = currentMedals[category] ?? 0;
+    currentMedals[category] = currentCount + 1;
+    
+    // Update predefined category if needed
+    if (isPredefined) {
+      int predefinedCount = currentMedals['Predefined'] ?? 0;
+      currentMedals['Predefined'] = predefinedCount + 1;
+    }
+    
+    // Log the updated medals
+    print('Updated medals: $currentMedals');
+    
+    // Apply the update with set() and merge:true to ensure we don't overwrite other fields
+    await userRef.set({'medals': currentMedals}, SetOptions(merge: true));
+    
+    // Verify the update
+    final verifyDoc = await userRef.get();
+    final verifyData = verifyDoc.data();
+    if (verifyData != null && verifyData.containsKey('medals')) {
+      print('Verification - Updated medals: ${verifyData['medals']}');
+    }
+    
+  } catch (e) {
+    print('Error updating medals: $e');
   }
+}
   
   // Método para actualizar reto y medallas
   Future<void> updateChallengeAndMedals(ChallengeModel challenge, {bool forceCompleted = false}) async {

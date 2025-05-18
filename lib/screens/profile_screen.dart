@@ -5,11 +5,11 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import '../models/task_model.dart';
 import '../database/auth_service.dart';
 import '../database/challenge_service.dart';
+import '../database/task_service.dart';
 import 'login_screen.dart';
-import 'main_navigation_screen.dart';
-import '../models/challenge_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,12 +21,18 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
   final ChallengeService _challengeService = ChallengeService();
+  final TaskService _taskService = TaskService();
   UserModel? _currentUser;
   bool _isLoading = true;
   
   // Para manejar las medallas
   Map<String, int> _medals = {};
   int _totalMedals = 0;
+  
+  // Para estadísticas de tareas
+  int _completedTasks = 0;
+  int _pendingTasks = 0;
+  int _expiredTasks = 0;
   
   @override
   void initState() {
@@ -35,9 +41,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
+    setState(() => _isLoading = true);
     User? user = _authService.currentUser;
 
     if (user != null) {
+      // Cargar datos del usuario
       DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -72,10 +80,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .get();
         }
         
+        // Cargar estadísticas de tareas
+        final tasks = await _taskService.streamTasks(user.uid).first;
+        final now = DateTime.now();
+        
         setState(() {
           _currentUser = UserModel.fromMap(snapshot.data()!);
           _medals = _currentUser?.medals ?? {};
           _totalMedals = _medals.values.fold(0, (sum, value) => sum + value);
+          
+          // Calcular estadísticas de tareas
+          _completedTasks = tasks.where((t) => t.isDone).length;
+          _pendingTasks = tasks.where((t) => !t.isDone && (t.dueDate == null || t.dueDate!.isAfter(now))).length;
+          _expiredTasks = tasks.where((t) => !t.isDone && t.dueDate != null && t.dueDate!.isBefore(now)).length;
+          
           _isLoading = false;
         });
       }
@@ -94,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _editDisplayName() async {
-    final TextEditingController _controller =
+    final TextEditingController controller =
         TextEditingController(text: _currentUser?.displayName ?? '');
 
     await showDialog(
@@ -103,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return AlertDialog(
           title: const Text('Editar nom d\'usuari'),
           content: TextField(
-            controller: _controller,
+            controller: controller,
             decoration: const InputDecoration(
               labelText: 'Nou nom',
             ),
@@ -115,7 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                String newName = _controller.text.trim();
+                String newName = controller.text.trim();
                 if (newName.isNotEmpty) {
                   await FirebaseFirestore.instance
                       .collection('users')
@@ -137,7 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _editField(String fieldKey, String currentValue, String label) async {
-    final TextEditingController _controller = TextEditingController(text: currentValue);
+    final TextEditingController controller = TextEditingController(text: currentValue);
 
     if (fieldKey == 'birthDate') {
       DateTime? selectedDate = await showDatePicker(
@@ -170,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return AlertDialog(
           title: Text('Editar $label'),
           content: TextField(
-            controller: _controller,
+            controller: controller,
             decoration: InputDecoration(labelText: label),
           ),
           actions: [
@@ -180,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                String newValue = _controller.text.trim();
+                String newValue = controller.text.trim();
                 await FirebaseFirestore.instance
                     .collection('users')
                     .doc(_currentUser!.uid)
@@ -209,61 +227,353 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = _authService.currentUser;
     final storageRef = FirebaseStorage.instance.ref().child('profile_pics/${user!.uid}.jpg');
 
-    final uploadTask = await storageRef.putFile(imageFile);
-    final downloadUrl = await uploadTask.ref.getDownloadURL();
+    setState(() => _isLoading = true);
 
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .update({'photoUrl': downloadUrl});
+    try {
+      final uploadTask = await storageRef.putFile(imageFile);
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
 
-    await _loadUserData();
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({'photoUrl': downloadUrl});
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto de perfil actualitzada')),
-      );
+      await _loadUserData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto de perfil actualitzada')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al pujar la imatge: ${e.toString()}')),
+        );
+        setState(() => _isLoading = false);
+      }
     }
   }
-
-  Widget _buildEditableCard(String title, String value, VoidCallback onTap) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        title: Text(title),
-        subtitle: Text(value.isNotEmpty ? value : 'No especificat'),
-        trailing: const Icon(Icons.edit),
-        onTap: onTap,
-      ),
+  
+  // Devuelve el color de la medalla según la cantidad
+  Color getMedalColor(int count) {
+    if (count >= 100) return Colors.amber; // Oro
+    if (count >= 30) return Colors.grey.shade400; // Plata
+    if (count >= 10) return Colors.brown.shade300; // Bronce
+    return Colors.grey.shade300; // Gris claro
+  }
+  
+  // Icono para cada tipo de medalla
+  IconData getMedalIcon(String category) {
+    switch (category) {
+      case 'Acadèmica': return Icons.school;
+      case 'Deportiva': return Icons.sports;
+      case 'Musical': return Icons.music_note;
+      case 'Familiar': return Icons.family_restroom;
+      case 'Laboral': return Icons.work;
+      case 'Artística': return Icons.palette;
+      case 'Mascota': return Icons.pets;
+      case 'Predefined': return Icons.star;
+      default: return Icons.emoji_events;
+    }
+  }
+  
+  // Construye una medalla individual
+  Widget _buildMedalItem(String category, int count) {
+    final Color medalColor = getMedalColor(count);
+    final IconData medalIcon = getMedalIcon(category);
+    
+    return Column(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+            border: Border.all(
+              color: medalColor,
+              width: 3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: medalColor.withOpacity(0.5),
+                blurRadius: 8,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Icon(
+            medalIcon,
+            size: 30,
+            color: medalColor,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          category,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade700,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: medalColor,
+          ),
+        ),
+      ],
     );
   }
-
-  Widget _buildInfoCard(String title, String value) {
+  
+  Widget _buildUserInfoSection() {
+  if (_currentUser == null) return const SizedBox.shrink();
+  
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    elevation: 3,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Profile photo - now larger and centered at the top
+          GestureDetector(
+            onTap: _pickAndUploadImage,
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 60, // Increased from 40
+                  backgroundImage: _currentUser!.photoUrl.isNotEmpty
+                      ? NetworkImage(_currentUser!.photoUrl)
+                      : null,
+                  child: _currentUser!.photoUrl.isEmpty
+                      ? const Icon(Icons.person, size: 40)
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // User information
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  _currentUser!.displayName,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit, size: 20),
+                onPressed: _editDisplayName,
+              ),
+            ],
+          ),
+          
+          Text(
+            _currentUser!.email,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Location row
+          _buildInfoRow(
+            Icons.location_on,
+            _currentUser!.city.isEmpty ? 'Afegir ciutat' : _currentUser!.city,
+            () => _editField('city', _currentUser!.city, 'Ciutat'),
+          ),
+          
+          // Birthdate row
+          _buildInfoRow(
+            Icons.calendar_today,
+            _currentUser!.birthDate.isEmpty ? 'Afegir data de naixement' : _currentUser!.birthDate,
+            () => _editField('birthDate', _currentUser!.birthDate, 'Data de naixement'),
+          ),
+          
+          // Bio row
+          _buildInfoRow(
+            Icons.work,
+            _currentUser!.bio.isEmpty ? 'Afegir biografia' : _currentUser!.bio,
+            () => _editField('bio', _currentUser!.bio, 'Biografia'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+// Helper method for building the info rows
+Widget _buildInfoRow(IconData icon, String text, VoidCallback onTap) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[600]),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 16,
+              color: text.startsWith('Afegir') ? Colors.grey[400] : Colors.grey[800],
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.edit, size: 18),
+          onPressed: onTap,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
+      ],
+    ),
+  );
+}
+  
+  // Construye la sección de estadísticas de tareas
+  Widget _buildTaskStatsSection() {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ListTile(
-        title: Text(title),
-        subtitle: Text(value.isNotEmpty ? value : 'No especificat'),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Estadístiques de tasques',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                // Tareas completadas
+                Expanded(
+                  child: _buildStatItem(
+                    'Completades',
+                    _completedTasks.toString(),
+                    Icons.check_circle,
+                    Colors.green,
+                  ),
+                ),
+                // Tareas pendientes
+                Expanded(
+                  child: _buildStatItem(
+                    'Pendents',
+                    _pendingTasks.toString(),
+                    Icons.access_time,
+                    Colors.orange,
+                  ),
+                ),
+                // Tareas expiradas
+                Expanded(
+                  child: _buildStatItem(
+                    'Expirades',
+                    _expiredTasks.toString(),
+                    Icons.event_busy,
+                    Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
   
-  // NUEVO: Sección para mostrar las medallas
+  // Widget para cada estadística
+  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 24,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Construye la sección de medallas
   Widget _buildMedalsSection() {
     if (_currentUser == null) return const SizedBox.shrink();
     
+    // Filtrar 'Predefined' para mostrarla al final
+    final regularMedals = _medals.entries.where((e) => e.key != 'Predefined').toList();
+    final predefinedMedal = _medals.entries.firstWhere((e) => e.key == 'Predefined', orElse: () => MapEntry('Predefined', 0));
+    
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -274,7 +584,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 const Text(
                   'Les meves medalles',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -300,163 +613,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Fila de categorías con sus contadores
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              alignment: WrapAlignment.center,
-              children: _medals.entries.map((entry) {
-                // No mostrar categorías sin medallas
-                if (entry.value <= 0) return const SizedBox.shrink();
-                
+            // Mostrar medallas en filas de 4
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                childAspectRatio: 0.75,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: regularMedals.length,
+              itemBuilder: (context, index) {
+                final entry = regularMedals[index];
                 return _buildMedalItem(entry.key, entry.value);
-              }).toList(),
+              },
             ),
+            
+            // Mostrar medalla predefinida al final si tiene valor
+            if (predefinedMedal.value > 0) ...[
+              const Divider(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildMedalItem('Predefined', predefinedMedal.value),
+                ],
+              ),
+            ],
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildMedalItem(String category, int count) {
-    IconData iconData;
-    Color color;
-    
-    // Asignar icono según categoría
-    switch (category) {
-      case 'Acadèmica':
-        iconData = Icons.school;
-        color = Colors.blue;
-        break;
-      case 'Deportiva':
-        iconData = Icons.sports;
-        color = Colors.green;
-        break;
-      case 'Musical':
-        iconData = Icons.music_note;
-        color = Colors.purple;
-        break;
-      case 'Familiar':
-        iconData = Icons.family_restroom;
-        color = Colors.orange;
-        break;
-      case 'Laboral':
-        iconData = Icons.work;
-        color = Colors.brown;
-        break;
-      case 'Artística':
-        iconData = Icons.palette;
-        color = Colors.pink;
-        break;
-      case 'Mascota':
-        iconData = Icons.pets;
-        color = Colors.teal;
-        break;
-      case 'Predefined':
-        iconData = Icons.auto_awesome;
-        color = Colors.amber;
-        break;
-      default:
-        iconData = Icons.emoji_events;
-        color = Colors.amber;
-    }
-    
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 30,
-          backgroundColor: color.withOpacity(0.2),
-          child: Icon(iconData, color: color, size: 36),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          category,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        Text(
-          '$count',
-          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-      ],
-    );
-  }
-  
-  // NUEVO: Sección de estadísticas de retos
-  Widget _buildChallengeStatsSection() {
-    return StreamBuilder<List<ChallengeModel>>(
-      stream: _challengeService.streamChallenges(_currentUser?.uid ?? ''),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        final challenges = snapshot.data!;
-        final completedCount = challenges.where((c) => c.isCompleted).length;
-        final pendingCount = challenges.where((c) => !c.isCompleted && !c.isExpired).length;
-        final expiredCount = challenges.where((c) => c.isExpired).length;
-        
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 3,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Resum de reptes',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStatItem('Completats', completedCount.toString(), Colors.green),
-                    _buildStatItem('Pendents', pendingCount.toString(), Colors.blue),
-                    _buildStatItem('Expirats', expiredCount.toString(), Colors.red),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-  
-  Widget _buildStatItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
     );
   }
 
@@ -464,17 +650,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Perfil'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
-            );
-          },
-        ),
+        title: const Text('El meu perfil'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -484,70 +660,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+          : RefreshIndicator(
+              onRefresh: _loadUserData,
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
                 children: [
-                  // Sección de foto de perfil
-                  GestureDetector(
-                    onTap: _pickAndUploadImage,
-                    child: Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        CircleAvatar(
-                          radius: 60,
-                          backgroundImage: _currentUser!.photoUrl.isNotEmpty
-                              ? NetworkImage(_currentUser!.photoUrl)
-                              : null,
-                          child: _currentUser!.photoUrl.isEmpty
-                              ? const Icon(Icons.person, size: 60)
-                              : null,
-                        ),
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Colors.blue,
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Información básica
-                  Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      title: const Text('Nom'),
-                      subtitle: Text(_currentUser?.displayName.isNotEmpty == true
-                          ? _currentUser!.displayName
-                          : 'No especificat'),
-                      trailing: const Icon(Icons.edit),
-                      onTap: _editDisplayName,
-                    ),
-                  ),
-                  
-                  _buildInfoCard('Correu electrònic', _currentUser?.email ?? ''),
-                  
-                  _buildEditableCard('Ciutat', _currentUser?.city ?? '',
-                      () => _editField('city', _currentUser?.city ?? '', 'Ciutat')),
-                  
-                  _buildEditableCard('Data de naixement', _currentUser?.birthDate ?? '',
-                      () => _editField('birthDate', _currentUser?.birthDate ?? '', 'Data de naixement')),
-                  
-                  _buildEditableCard('Informació personal', _currentUser?.bio ?? '',
-                      () => _editField('bio', _currentUser?.bio ?? '', 'Informació personal')),
-                  
-                  // NUEVO: Sección de estadísticas de retos
-                  _buildChallengeStatsSection(),
-                  
-                  // NUEVO: Sección de medallas
+                  _buildUserInfoSection(),
+                  _buildTaskStatsSection(),
                   _buildMedalsSection(),
                 ],
               ),

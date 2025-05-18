@@ -29,6 +29,8 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   bool _isPredefined = false; // Retos creados por la app
   bool _isSaving = false;
   late final String _uid;
+  // Variable para controlar si ya se mostró el popup de medalla
+  bool _medalPopupShown = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _docSub;
   
   // Categorías disponibles (iguales a las de tareas)
@@ -158,17 +160,30 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     // No incrementar si ya está completo
     if (_isCompleted) return;
     
+    final bool wasCompleted = _isCompleted;
+    
     setState(() {
       _currentCount++;
       if (_currentCount >= _targetCount) {
         _isCompleted = true;
-        
-        // Mostrar pop-up de medalla conseguida
-        if (_isCompleted) {
-          _showMedalAchievedDialog();
-        }
       }
     });
+    
+    // If it just got completed, directly update the medals
+    if (!wasCompleted && _isCompleted && !_medalPopupShown) {
+      // Update medals in Firestore
+      await _challengeService.updateUserMedals(
+        _uid,
+        _category,
+        _isPredefined
+      );
+      
+      // Marcar que ya se mostró el popup
+      _medalPopupShown = true;
+      
+      // Show medal dialog
+      await _showMedalAchievedDialog();
+    }
   }
   
   // Nuevo método para decrementar el progreso
@@ -184,6 +199,8 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       // Si estaba completado y ahora no, actualizamos el estado
       if (_currentCount < _targetCount) {
         _isCompleted = false;
+        // Resetear la bandera del popup si se quita el estado de completado
+        _medalPopupShown = false;
       }
     });
   }
@@ -284,6 +301,97 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     );
   }
   
+  // Método para construir el widget de medalla que se conseguirá
+  Widget _buildMedalToAchieve() {
+    IconData medalIcon;
+    Color medalColor;
+    
+    switch (_category) {
+      case 'Acadèmica':
+        medalIcon = Icons.school;
+        medalColor = Colors.blue;
+        break;
+      case 'Deportiva':
+        medalIcon = Icons.sports;
+        medalColor = Colors.green;
+        break;
+      case 'Musical':
+        medalIcon = Icons.music_note;
+        medalColor = Colors.purple;
+        break;
+      case 'Familiar':
+        medalIcon = Icons.family_restroom;
+        medalColor = Colors.orange;
+        break;
+      case 'Laboral':
+        medalIcon = Icons.work;
+        medalColor = Colors.brown;
+        break;
+      case 'Artística':
+        medalIcon = Icons.palette;
+        medalColor = Colors.pink;
+        break;
+      case 'Mascota':
+        medalIcon = Icons.pets;
+        medalColor = Colors.teal;
+        break;
+      default:
+        medalIcon = Icons.emoji_events;
+        medalColor = Colors.amber;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Medalla que s\'aconseguirà',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: medalColor.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              medalIcon,
+              size: 30,
+              color: medalColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _category,
+            style: TextStyle(
+              fontSize: 14,
+              color: medalColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            _type,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
   Future<void> _save() async {
     // Validación
     final title = _titleCtrl.text.trim();
@@ -339,16 +447,30 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         isPredefined: _isPredefined,
       );
       
+      // Determinar si es un reto recién completado
+      final bool wasCompleted = isNew ? false : widget.challenge!.isCompleted;
+      final bool isNewlyCompleted = !wasCompleted && _isCompleted;
+      
       // Guardar en Firebase
       if (isNew) {
         await _challengeService.addChallenge(challenge);
       } else {
-        // Usar método especial que también maneja medallas
-        bool wasCompleted = widget.challenge!.isCompleted;
-        await _challengeService.updateChallengeAndMedals(challenge);
+        // Actualizar el reto
+        await _challengeService.updateChallenge(challenge);
         
-        // Mostrar popup de medalla si se completa
-        if (!wasCompleted && _isCompleted) {
+        // Si el reto acaba de completarse y no se ha mostrado el popup, actualizar medallas
+        if (isNewlyCompleted && !_medalPopupShown) {
+          // Actualizar medallas en Firestore
+          await _challengeService.updateUserMedals(
+            _uid,
+            _category,
+            _isPredefined
+          );
+          
+          // Marcar que ya se mostró el popup
+          _medalPopupShown = true;
+          
+          // Mostrar diálogo de medalla
           await _showMedalAchievedDialog();
         }
       }
@@ -418,25 +540,336 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Repte eliminat correctament')),
         );
-        
-        // Usar Future.delayed para garantizar que la navegación se produce después de todo lo demás
-        Future.delayed(Duration.zero, () {
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
-        });
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('Error al eliminar el repte: ${e.toString()}')),
         );
       }
     }
   }
   
-  // Función para obtener icono según categoría
+  Future<void> _forceComplete() async {
+    if (_isCompleted) return;
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Marcar com a completat'),
+        content: const Text('Segur que vols marcar aquest repte com a completat?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel·lar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Marcar'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm != true) return;
+    
+    setState(() {
+      _currentCount = _targetCount;
+      _isCompleted = true;
+    });
+    
+    // Si no se ha mostrado el popup, actualizar medallas
+    if (!_medalPopupShown) {
+      // Actualizar medallas en Firestore
+      await _challengeService.updateUserMedals(
+        _uid,
+        _category,
+        _isPredefined
+      );
+      
+      // Marcar que ya se mostró el popup
+      _medalPopupShown = true;
+      
+      // Mostrar diálogo de medalla
+      await _showMedalAchievedDialog();
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.challenge != null;
+    final isPredefined = _isPredefined;
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEdit
+            ? isPredefined
+                ? 'Detall del repte'
+                : 'Editar repte'
+            : 'Nou repte'),
+        actions: [
+          // Botón de eliminar solo para edición
+          if (isEdit && !isPredefined)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _delete,
+            ),
+        ],
+      ),
+      body: _isSaving
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 1. Campo título
+                  TextField(
+                    controller: _titleCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Títol del repte',
+                      border: OutlineInputBorder(),
+                    ),
+                    readOnly: isPredefined,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 2. Campo descripción
+                  TextField(
+                    controller: _descriptionCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripció (opcional)',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                    readOnly: isPredefined,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 3. Sección de categoría
+                  GestureDetector(
+                    onTap: isPredefined ? null : _selectCategory,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getCategoryIcon(_category),
+                            color: _getCategoryColor(_category),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('Categoria: $_category'),
+                          const Spacer(),
+                          if (!isPredefined)
+                            const Icon(Icons.arrow_drop_down),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 4. Sección de cantidad objetivo
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _targetCountCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantitat objectiu',
+                            border: OutlineInputBorder(),
+                          ),
+                          readOnly: isPredefined,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 5. Sección de fecha límite (solo para retos no predefinidos)
+                  if (!isPredefined)
+                    GestureDetector(
+                      onTap: _pickDueDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today),
+                            const SizedBox(width: 8),
+                            Text(
+                              _dueDate == null
+                                  ? 'Sense data límit'
+                                  : 'Data límit: ${DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!)}',
+                            ),
+                            const Spacer(),
+                            if (_dueDate != null)
+                              IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: _removeDueDate,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  
+                  // Sección de progreso (solo para edición)
+                  if (isEdit) ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Progres actual:',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: _targetCount > 0
+                          ? _currentCount / _targetCount
+                          : 0,
+                      minHeight: 15,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Completat: $_currentCount/$_targetCount',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${((_currentCount / _targetCount) * 100).toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Botones de incremento/decremento para retos personales
+                    if (!isPredefined && !_isCompleted)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _decrementProgress,
+                            icon: const Icon(Icons.remove),
+                            label: const Text('Decrementar'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red[400],
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          ElevatedButton.icon(
+                            onPressed: _incrementProgress,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Incrementar'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green[400],
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    
+                    // Botón para marcar como completado
+                    if (!_isCompleted)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: ElevatedButton.icon(
+                          onPressed: _forceComplete,
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text('Marcar com completat'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
+                        ),
+                      ),
+                    
+                    // Mensaje de felicitación si está completo
+                    if (_isCompleted)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green[100],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Repte completat!',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Has guanyat una medalla $_category!',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                  
+                  // Mostrar la sección de medalla a conseguir si el reto no está completado
+                  if (!_isCompleted) 
+                    _buildMedalToAchieve(),
+                  
+                  // Botón de guardar
+                  if (!isPredefined)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: ElevatedButton(
+                        onPressed: _save,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
+                        child: Text(isEdit ? 'Actualitzar' : 'Crear'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+  
   IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'Acadèmica':
@@ -458,7 +891,6 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     }
   }
   
-  // Función para obtener color según categoría
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'Acadèmica':
@@ -478,313 +910,5 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       default:
         return Colors.amber;
     }
-  }
-  
-  @override
-  Widget build(BuildContext context) {
-    final isNew = widget.challenge == null;
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isNew ? 'Nou Repte' : 'Detalls del Repte'),
-        actions: [
-          // Icono de eliminar solo para retos existentes no predefinidos
-          if (!isNew && !_isPredefined)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _delete,
-            ),
-        ],
-      ),
-      body: _isSaving
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Campo de título
-                  TextField(
-                    controller: _titleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Títol del repte',
-                      border: OutlineInputBorder(),
-                    ),
-                    enabled: !_isPredefined,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Campo de descripción
-                  TextField(
-                    controller: _descriptionCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Descripció',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 3,
-                    enabled: !_isPredefined,
-                  ),
-                  
-                  const SizedBox(height: 16),
-
-                  // MOVIDO: Barra de progreso mejorada y más gruesa
-                  Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Progrés actual: $_currentCount/$_targetCount',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          // Barra de progreso mejorada - más gruesa
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              height: 18, // Más gruesa
-                              width: double.infinity,
-                              color: Colors.grey.shade200,
-                              child: Row(
-                                children: [
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 500),
-                                    curve: Curves.easeInOut,
-                                    height: 18, // Más gruesa
-                                    width: MediaQuery.of(context).size.width * 
-                                        (_targetCount > 0 ? _currentCount / _targetCount : 0) * 0.75,
-                                    decoration: BoxDecoration(
-                                      color: _isCompleted
-                                          ? Colors.green
-                                          : _isExpired
-                                              ? Colors.red
-                                              : Colors.blue,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Completat: ${_targetCount > 0 ? ((_currentCount / _targetCount) * 100).toInt() : 0}%',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _isCompleted ? Colors.green : Colors.grey[600],
-                                ),
-                              ),
-                              if (!_isPredefined && !_isCompleted)
-                                Row(
-                                  children: [
-                                    // Botón decrementar
-                                    ElevatedButton.icon(
-                                      onPressed: _currentCount > 0 ? _decrementProgress : null,
-                                      icon: const Icon(Icons.remove),
-                                      label: const Text(''),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Botón incrementar
-                                    ElevatedButton.icon(
-                                      onPressed: _incrementProgress,
-                                      icon: const Icon(Icons.add),
-                                      label: const Text('Avançar'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blue,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Tipo de reto (predefinido o personal)
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _isPredefined ? Colors.blue.shade100 : Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _isPredefined ? Icons.auto_awesome : Icons.person,
-                          color: _isPredefined ? Colors.blue : Colors.orange,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _isPredefined ? 'Repte General' : 'Repte Personal',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: _isPredefined ? Colors.blue.shade800 : Colors.orange.shade800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Selección de categoría
-                  ListTile(
-                    title: const Text('Categoria'),
-                    subtitle: Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: _getCategoryColor(_category),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(_category),
-                      ],
-                    ),
-                    trailing: !_isPredefined
-                        ? const Icon(Icons.arrow_forward_ios, size: 16)
-                        : null,
-                    onTap: _isPredefined ? null : _selectCategory,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Fecha límite (solo para retos personales)
-                  if (!_isPredefined)
-                    ListTile(
-                      title: const Text('Data límit'),
-                      subtitle: _dueDate != null
-                          ? Text(DateFormat('dd/MM/yyyy - HH:mm', 'ca')
-                              .format(_dueDate!))
-                          : const Text('Sense data límit'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_dueDate != null)
-                            IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: _removeDueDate,
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.calendar_today),
-                            onPressed: _pickDueDate,
-                          ),
-                        ],
-                      ),
-                    ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Cantidad objetivo (solo editable para retos personales)
-                  ListTile(
-                    title: const Text('Quantitat objectiu'),
-                    subtitle: !_isPredefined
-                        ? TextField(
-                            controller: _targetCountCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: 'Quantitat',
-                              border: OutlineInputBorder(),
-                            ),
-                            enabled: !_isPredefined,
-                          )
-                        : Text('${_targetCount}'),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // NUEVO: Sección de medalla que se obtendrá (centrada)
-                  Center(
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 3,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'Medalla que s\'aconseguirà',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: _getCategoryColor(_category).withOpacity(0.2),
-                              child: Icon(
-                                _getCategoryIcon(_category),
-                                color: _getCategoryColor(_category),
-                                size: 36,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _category,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _getCategoryColor(_category),
-                              ),
-                            ),
-                            Text(
-                              _isPredefined ? 'Repte General' : 'Repte Personal',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Guardar cambios (no disponible para retos predefinidos)
-                  if (!_isPredefined)
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: _save,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Guardar canvis'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-    );
   }
 }
