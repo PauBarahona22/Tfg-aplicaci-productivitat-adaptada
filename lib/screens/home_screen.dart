@@ -29,6 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final ChallengeService _challengeService = ChallengeService();
   final uid = FirebaseAuth.instance.currentUser?.uid;
 
+  // ✅ OPTIMIZACIÓN SIMPLE: Cache las rutas de imagen
+  static const String _mascotDayPath = 'assets/images/mascot_day.png';
+  static const String _mascotNightPath = 'assets/images/mascot_night.png';
+
   // Función para obtener la imagen de la mascota según la hora
   String _getMascotImage() {
     final now = DateTime.now();
@@ -37,9 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // De 7:00 a 22:59 = día (despierta)
     // De 23:00 a 6:59 = noche (dormida)
     if (hour >= 7 && hour <= 22) {
-      return 'assets/images/mascot_day.png';
+      return _mascotDayPath;
     } else {
-      return 'assets/images/mascot_night.png';
+      return _mascotNightPath;
     }
   }
 
@@ -259,22 +263,26 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
               border: Border(
-                top: BorderSide(color: Colors.blue.shade300, width: 2), // ✅ BORDE ARRIBA
-                bottom: BorderSide(color: Colors.blue.shade300, width: 2), // ✅ BORDE ABAJO
+                top: BorderSide(color: Colors.blue.shade300, width: 2),
+                bottom: BorderSide(color: Colors.blue.shade300, width: 2),
               ),
             ),
             child: Row(
               children: [
-                // Imagen de la mascota
+                // ✅ IMAGEN OPTIMIZADA CON CACHÉ
                 Container(
-                  width: 140,
-                  height: 140,
+                  width: 160,
+                  height: 160,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Image.asset(
                     _getMascotImage(),
-                    fit: BoxFit.contain,
+                    fit: BoxFit.scaleDown,
+                    // ✅ OPTIMIZACIONES SIMPLES
+                    cacheWidth: 300,  // Cache específico para este tamaño
+                    cacheHeight: 300, // Evita redimensionar cada vez
+                    filterQuality: FilterQuality.high, // Balance calidad/velocidad
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         decoration: BoxDecoration(
@@ -359,7 +367,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             
-                            // ✅ CONTENIDO DINÁMICO - tareas O mensaje
+                            // Contenido dinámico - tareas O mensaje
                             if (todayTasks.isEmpty)
                               const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -397,12 +405,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               )),
                             
-                            // ✅ CONTADORES JUSTO DEBAJO - con pequeño margen
+                            // Contadores justo debajo
                             Padding(
                               padding: const EdgeInsets.only(
                                 left: 16.0, 
                                 right: 16.0, 
-                                top: 16.0,  // ✅ Pequeño margen desde el contenido anterior
+                                top: 16.0,
                                 bottom: 16.0
                               ),
                               child: Row(
@@ -503,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             
-                            // ✅ SPACER para empujar todo hacia arriba
+                            // Spacer para empujar todo hacia arriba
                             const Spacer(),
                           ],
                         );
