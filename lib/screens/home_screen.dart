@@ -1,4 +1,3 @@
-// lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,71 +14,52 @@ import 'task_detail_screen.dart';
 import 'day_detail_screen.dart';
 import 'reminder_detail_screen.dart';
 import 'challenge_detail_screen.dart';
-
+import 'dart:io';
+import '../database/local_storage_service.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-
 class _HomeScreenState extends State<HomeScreen> {
   final TaskService _taskService = TaskService();
   final ReminderService _reminderService = ReminderService();
   final ChallengeService _challengeService = ChallengeService();
   final uid = FirebaseAuth.instance.currentUser?.uid;
-
-  // ✅ OPTIMIZACIÓN SIMPLE: Cache las rutas de imagen
   static const String _mascotDayPath = 'assets/images/mascot_day.png';
   static const String _mascotNightPath = 'assets/images/mascot_night.png';
-
-  // Función para obtener la imagen de la mascota según la hora
   String _getMascotImage() {
     final now = DateTime.now();
     final hour = now.hour;
-    
-    // De 7:00 a 22:59 = día (despierta)
-    // De 23:00 a 6:59 = noche (dormida)
     if (hour >= 7 && hour <= 22) {
       return _mascotDayPath;
     } else {
       return _mascotNightPath;
     }
   }
-
-  // Función para obtener la fecha formateada en catalán
   String _getFormattedDate() {
     final now = DateTime.now();
     final dayFormatter = DateFormat('EEEE', 'ca');
     final dayNumber = now.day;
     final monthFormatter = DateFormat('MMMM', 'ca');
-    
     final dayName = dayFormatter.format(now);
     final monthName = monthFormatter.format(now);
-    
     return 'Avui, $dayName, $dayNumber de $monthName';
   }
-
-  // Función para filtrar tareas del día actual
   List<TaskModel> _getTasksForToday(List<TaskModel> allTasks) {
     final today = DateTime.now();
     final todayNormalized = DateTime(today.year, today.month, today.day);
-    
     return allTasks.where((task) {
-      // Verificar fecha de vencimiento
       if (task.dueDate != null) {
         final taskDate = DateTime(
           task.dueDate!.year,
           task.dueDate!.month,
           task.dueDate!.day,
         );
-        
         if (taskDate.isAtSameMomentAs(todayNormalized)) {
           return true;
         }
       }
-      
-      // Verificar fechas asignadas
       return task.assignedDates.any((date) {
         final assignedDate = DateTime(
           date.year,
@@ -90,40 +70,30 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }).toList();
   }
-
-  // Función para contar recordatorios del día actual
   int _getRemindersCountForToday(List<ReminderModel> allReminders) {
     final today = DateTime.now();
     final todayNormalized = DateTime(today.year, today.month, today.day);
-    
     return allReminders.where((reminder) {
-      // Verificar tiempo de recordatorio
       if (reminder.reminderTime != null) {
         final reminderDate = DateTime(
           reminder.reminderTime!.year,
           reminder.reminderTime!.month,
           reminder.reminderTime!.day,
         );
-        
         if (reminderDate.isAtSameMomentAs(todayNormalized)) {
           return true;
         }
       }
-      
-      // Verificar fecha de vencimiento
       if (reminder.dueDate != null) {
         final dueDate = DateTime(
           reminder.dueDate!.year,
           reminder.dueDate!.month,
           reminder.dueDate!.day,
         );
-        
         if (dueDate.isAtSameMomentAs(todayNormalized)) {
           return true;
         }
       }
-      
-      // Verificar fechas asignadas
       return reminder.assignedDates.any((date) {
         final assignedDate = DateTime(
           date.year,
@@ -134,12 +104,9 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }).length;
   }
-
-  // Función para contar retos con vencimiento hoy
   int _getChallengesCountForToday(List<ChallengeModel> allChallenges) {
     final today = DateTime.now();
     final todayNormalized = DateTime(today.year, today.month, today.day);
-    
     return allChallenges.where((challenge) {
       if (challenge.dueDate != null) {
         final dueDate = DateTime(
@@ -147,23 +114,23 @@ class _HomeScreenState extends State<HomeScreen> {
           challenge.dueDate!.month,
           challenge.dueDate!.day,
         );
-        
         return dueDate.isAtSameMomentAs(todayNormalized);
       }
       return false;
     }).length;
   }
-
   @override
   Widget build(BuildContext context) {
     if (uid == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: Color(0xFFBAD1C2),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF4FA095))),
       );
     }
-
     return Scaffold(
+      backgroundColor: Color(0xFFBAD1C2),
       appBar: AppBar(
+        backgroundColor: Color(0xFF9BB8A5),
         automaticallyImplyLeading: false,
         title: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
@@ -171,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .doc(uid)
               .snapshots(),
           builder: (context, snap) {
-            if (!snap.hasData) return const Text('Carregant...');
+            if (!snap.hasData) return Text('Carregant...', style: TextStyle(color: Colors.white));
             final data = snap.data!.data()!;
             final user = UserModel.fromMap(data);
             return Row(
@@ -185,32 +152,43 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   },
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundImage: user.photoUrl.isNotEmpty
-                        ? NetworkImage(user.photoUrl)
-                        : null,
-                    child: user.photoUrl.isEmpty
-                        ? const Icon(Icons.person, size: 20)
-                        : null,
+                  child: FutureBuilder<String?>(
+                    future: LocalStorageService.getProfileImagePath(user.uid),
+                    builder: (context, snapshot) {
+                      final localImagePath = snapshot.data;
+                      return CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Color(0xFF4FA095),
+                        backgroundImage: localImagePath != null
+                            ? FileImage(File(localImagePath))
+                            : (user.photoUrl.isNotEmpty
+                                ? NetworkImage(user.photoUrl)
+                                : null),
+                        child: (localImagePath == null && user.photoUrl.isEmpty)
+                            ? Icon(Icons.person, size: 20, color: Colors.white)
+                            : null,
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(user.displayName, style: const TextStyle(fontSize: 18)),
+                Text(user.displayName, style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
               ],
             );
           },
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Color(0xFF25766B),
         onPressed: () {
           showModalBottomSheet(
             context: context,
+            backgroundColor: Color(0xFF9BB8A5),
             builder: (context) => Wrap(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.checklist),
-                  title: const Text('Nova Tasca'),
+                  leading: Icon(Icons.checklist, color: Color(0xFF25766B)),
+                  title: Text('Nova Tasca', style: TextStyle(color: Colors.white)),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -222,8 +200,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.notifications),
-                  title: const Text('Nou Recordatori'),
+                  leading: Icon(Icons.notifications, color: Color(0xFF25766B)),
+                  title: Text('Nou Recordatori', style: TextStyle(color: Colors.white)),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -235,8 +213,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.emoji_events),
-                  title: const Text('Nou Repte'),
+                  leading: Icon(Icons.emoji_events, color: Color(0xFF25766B)),
+                  title: Text('Nou Repte', style: TextStyle(color: Colors.white)),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -251,148 +229,154 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add, color: Colors.white),
       ),
       body: Column(
         children: [
-          // SECCIÓN PRINCIPAL - Con bordes arriba y abajo
           Container(
             width: double.infinity,
-            height: 180,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+            height: 210,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF7C9F88), Color(0xFF4FA095)],
+              ),
               border: Border(
-                top: BorderSide(color: Colors.blue.shade300, width: 2),
-                bottom: BorderSide(color: Colors.blue.shade300, width: 2),
+                top: BorderSide(color: Color(0xFF3A8B80), width: 3),
+                bottom: BorderSide(color: Color(0xFF3A8B80), width: 3),
               ),
             ),
             child: Row(
               children: [
-                // ✅ IMAGEN OPTIMIZADA CON CACHÉ
                 Container(
                   width: 160,
-                  height: 160,
+                  height: 200,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withOpacity(0.2),
                   ),
                   child: Image.asset(
                     _getMascotImage(),
                     fit: BoxFit.scaleDown,
-                    // ✅ OPTIMIZACIONES SIMPLES
-                    cacheWidth: 300,  // Cache específico para este tamaño
-                    cacheHeight: 300, // Evita redimensionar cada vez
-                    filterQuality: FilterQuality.high, // Balance calidad/velocidad
+                    cacheWidth: 300,
+                    cacheHeight: 300,
+                    filterQuality: FilterQuality.high,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
+                          color: Colors.white.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.pets,
                           size: 70,
-                          color: Colors.grey,
+                          color: Colors.white,
                         ),
                       );
                     },
                   ),
                 ),
                 const SizedBox(width: 20),
-                // Fecha actual
                 Expanded(
                   child: Text(
                     _getFormattedDate(),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          
-          // Sección de tareas con contadores PEGADOS
           Expanded(
             child: StreamBuilder<List<TaskModel>>(
               stream: _taskService.streamTasks(uid!),
               builder: (context, taskSnapshot) {
                 if (taskSnapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)));
                 }
-                
                 if (taskSnapshot.hasError) {
-                  return Center(child: Text('Error: ${taskSnapshot.error}'));
+                  return Center(child: Text('Error: ${taskSnapshot.error}', style: TextStyle(color: Color(0xFF25766B))));
                 }
-                
-                final todayTasks = taskSnapshot.hasData 
+                final todayTasks = taskSnapshot.hasData
                     ? _getTasksForToday(taskSnapshot.data!)
                     : <TaskModel>[];
-                
                 return StreamBuilder<List<ReminderModel>>(
                   stream: _reminderService.streamReminders(uid!),
                   builder: (context, reminderSnapshot) {
                     if (reminderSnapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
+                      return Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)));
                     }
-                    
-                    final remindersCount = reminderSnapshot.hasData 
+                    final remindersCount = reminderSnapshot.hasData
                         ? _getRemindersCountForToday(reminderSnapshot.data!)
                         : 0;
-                    
                     return StreamBuilder<List<ChallengeModel>>(
                       stream: _challengeService.streamChallenges(uid!),
                       builder: (context, challengeSnapshot) {
                         if (challengeSnapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                          return Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)));
                         }
-                        
-                        final challengesCount = challengeSnapshot.hasData 
+                        final challengesCount = challengeSnapshot.hasData
                             ? _getChallengesCountForToday(challengeSnapshot.data!)
                             : 0;
-                        
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Título de la sección
-                            const Padding(
+                            Container(
+                              width: double.infinity,
+                              color: Color(0xFF9BB8A5),
                               padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
                               child: Text(
                                 'Tasques del dia:',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                            
-                            // Contenido dinámico - tareas O mensaje
                             if (todayTasks.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                child: Text('Tens el dia lliure'),
+                              Container(
+                                color: Color(0xFFBAD1C2),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  child: Text('Tens el dia lliure', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500)),
+                                ),
                               )
                             else
-                              // Lista de tareas
                               ...todayTasks.map((task) => Card(
+                                color: Color.fromARGB(61, 35, 224, 161),
                                 margin: const EdgeInsets.symmetric(
                                   horizontal: 8.0,
                                   vertical: 4.0,
                                 ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15.0),
+                                  side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                                ),
                                 child: ListTile(
-                                  title: Text(task.title),
-                                  subtitle: Text(task.type),
-                                  leading: CircleAvatar(
-                                    backgroundColor: task.isDone
-                                        ? Colors.green
-                                        : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
-                                            ? Colors.red
-                                            : Colors.blue),
-                                    radius: 12,
+                                  title: Text(task.title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                  subtitle: Text(task.type, style: TextStyle(color: Colors.white.withOpacity(0.8))),
+                                  leading: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2), 
+                                    ),
+                                    child: CircleAvatar(
+                                      backgroundColor: task.isDone
+                                          ? Colors.green        
+                                          : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
+                                              ? Colors.red       
+                                              : Colors.blue),    
+                                      radius: 12,
+                                    ),
                                   ),
                                   trailing: task.dueDate != null
-                                      ? Text(DateFormat('HH:mm', 'ca').format(task.dueDate!))
+                                      ? Text(DateFormat('HH:mm', 'ca').format(task.dueDate!), style: TextStyle(color: Colors.white.withOpacity(0.9)))
                                       : null,
                                   onTap: () {
                                     Navigator.push(
@@ -404,18 +388,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                 ),
                               )),
-                            
-                            // Contadores justo debajo
                             Padding(
                               padding: const EdgeInsets.only(
-                                left: 16.0, 
-                                right: 16.0, 
+                                left: 16.0,
+                                right: 16.0,
                                 top: 16.0,
                                 bottom: 16.0
                               ),
                               child: Row(
                                 children: [
-                                  // Contador de recordatorios
                                   Expanded(
                                     child: GestureDetector(
                                       onTap: () {
@@ -431,15 +412,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
+                                          color: Color(0xFF4FA095),
                                           borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.grey.shade300),
+                                          border: Border.all(color: Color(0xFF3A8B80)),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Color(0xFF25766B).withOpacity(0.3),
+                                              blurRadius: 6,
+                                              offset: Offset(0, 3),
+                                            ),
+                                          ],
                                         ),
                                         child: Column(
                                           children: [
                                             Icon(
                                               Icons.notifications,
-                                              color: Colors.grey.shade600,
+                                              color: Colors.white,
                                               size: 24,
                                             ),
                                             const SizedBox(height: 4),
@@ -448,12 +436,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                               style: TextStyle(
                                                 fontSize: 20,
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.grey.shade600,
+                                                color: Colors.white,
                                               ),
                                             ),
-                                            const Text(
+                                            Text(
                                               'Recordatoris',
-                                              style: TextStyle(fontSize: 12),
+                                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
                                             ),
                                           ],
                                         ),
@@ -461,8 +449,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  
-                                  // Contador de retos
                                   Expanded(
                                     child: GestureDetector(
                                       onTap: () {
@@ -478,15 +464,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
+                                          color: Color(0xFF3A8B80),
                                           borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.grey.shade300),
+                                          border: Border.all(color: Color(0xFF25766B)),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Color(0xFF25766B).withOpacity(0.3),
+                                              blurRadius: 6,
+                                              offset: Offset(0, 3),
+                                            ),
+                                          ],
                                         ),
                                         child: Column(
                                           children: [
                                             Icon(
                                               Icons.emoji_events,
-                                              color: Colors.grey.shade600,
+                                              color: Colors.white,
                                               size: 24,
                                             ),
                                             const SizedBox(height: 4),
@@ -495,12 +488,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                               style: TextStyle(
                                                 fontSize: 20,
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.grey.shade600,
+                                                color: Colors.white,
                                               ),
                                             ),
-                                            const Text(
+                                            Text(
                                               'Reptes',
-                                              style: TextStyle(fontSize: 12),
+                                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
                                             ),
                                           ],
                                         ),
@@ -510,8 +503,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ],
                               ),
                             ),
-                            
-                            // Spacer para empujar todo hacia arriba
                             const Spacer(),
                           ],
                         );

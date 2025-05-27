@@ -24,14 +24,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Introdueix un correu electrònic vàlid')),
+        SnackBar(
+          content: Text('Introdueix un correu electrònic vàlid'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
       return;
     }
 
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La contrasenya ha de tenir almenys 6 caràcters')),
+        SnackBar(
+          content: Text('La contrasenya ha de tenir almenys 6 caràcters'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
       return;
     }
@@ -51,7 +57,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
     } else {
       if (mounted) {
@@ -66,8 +75,13 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0xFFBAD1C2),
       appBar: AppBar(
-        title: const Text('Iniciar Sessió'),
+        backgroundColor: Color(0xFF4FA095),
+        title: Text(
+          'Iniciar Sessió',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -76,24 +90,41 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Correu electrònic',
+                labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25766B)),
+                ),
               ),
+              style: TextStyle(color: Color(0xFF25766B)),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Contrasenya',
+                labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25766B)),
+                ),
               ),
+              style: TextStyle(color: Color(0xFF25766B)),
               obscureText: true,
             ),
             const SizedBox(height: 24),
             _isLoading
-                ? const CircularProgressIndicator()
+                ? CircularProgressIndicator(color: Color(0xFF4FA095))
                 : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF25766B),
+                      padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    ),
                     onPressed: _login,
-                    child: const Text('Iniciar Sessió'),
+                    child: Text(
+                      'Iniciar Sessió',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
                   ),
             const SizedBox(height: 16),
             TextButton(
@@ -103,7 +134,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
                 );
               },
-              child: const Text('Has oblidat la contrasenya?'),
+              child: Text(
+                'Has oblidat la contrasenya?',
+                style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w500),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -112,7 +146,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   MaterialPageRoute(builder: (context) => const RegisterScreen()),
                 );
               },
-              child: const Text('No tens compte? Registra\'t'),
+              child: Text(
+                'No tens compte? Registra\'t',
+                style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w500),
+              ),
             ),
           ],
         ),

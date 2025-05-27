@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
@@ -9,6 +8,7 @@ import '../models/task_model.dart';
 import '../database/auth_service.dart';
 import '../database/challenge_service.dart';
 import '../database/task_service.dart';
+import '../database/local_storage_service.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -24,16 +24,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TaskService _taskService = TaskService();
   UserModel? _currentUser;
   bool _isLoading = true;
-  
-  // Para manejar las medallas
+
+  String? _localImagePath;
   Map<String, int> _medals = {};
   int _totalMedals = 0;
-  
-  // Para estadísticas de tareas
   int _completedTasks = 0;
   int _pendingTasks = 0;
   int _expiredTasks = 0;
-  
+
   @override
   void initState() {
     super.initState();
@@ -45,7 +43,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     User? user = _authService.currentUser;
 
     if (user != null) {
-      // Cargar datos del usuario
       DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -53,8 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (snapshot.exists) {
         final userData = snapshot.data()!;
-        
-        // Si el usuario no tiene medallas en su perfil, inicializarlas
+
         if (!userData.containsKey('medals')) {
           await FirebaseFirestore.instance
               .collection('users')
@@ -72,28 +68,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Predefined': 0,
                 }
               });
-          
-          // Recargar para obtener los datos actualizados
+
           snapshot = await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .get();
         }
-        
-        // Cargar estadísticas de tareas
+
+        final localImagePath = await LocalStorageService.getProfileImagePath(user.uid);
         final tasks = await _taskService.streamTasks(user.uid).first;
         final now = DateTime.now();
-        
+
         setState(() {
           _currentUser = UserModel.fromMap(snapshot.data()!);
+          _localImagePath = localImagePath;
           _medals = _currentUser?.medals ?? {};
           _totalMedals = _medals.values.fold(0, (sum, value) => sum + value);
-          
-          // Calcular estadísticas de tareas
+
           _completedTasks = tasks.where((t) => t.isDone).length;
           _pendingTasks = tasks.where((t) => !t.isDone && (t.dueDate == null || t.dueDate!.isAfter(now))).length;
           _expiredTasks = tasks.where((t) => !t.isDone && t.dueDate != null && t.dueDate!.isBefore(now)).length;
-          
+
           _isLoading = false;
         });
       }
@@ -119,19 +114,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Editar nom d\'usuari'),
+          backgroundColor: Color(0xFFBAD1C2),
+          title: Text('Editar nom d\'usuari', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
           content: TextField(
             controller: controller,
-            decoration: const InputDecoration(
+            style: TextStyle(color: Color(0xFF25766B)),
+            decoration: InputDecoration(
               labelText: 'Nou nom',
+              labelStyle: TextStyle(color: Color(0xFF4FA095)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095))),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel·lar'),
+              child: Text('Cancel·lar', style: TextStyle(color: Color(0xFF25766B))),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF4FA095)),
               onPressed: () async {
                 String newName = controller.text.trim();
                 if (newName.isNotEmpty) {
@@ -142,11 +142,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.pop(context);
                   await _loadUserData();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Nom actualitzat correctament')),
+                    SnackBar(
+                      content: Text('Nom actualitzat correctament'),
+                      backgroundColor: Color(0xFF4FA095),
+                    ),
                   );
                 }
               },
-              child: const Text('Guardar'),
+              child: Text('Guardar', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -163,6 +166,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         initialDate: DateTime.tryParse(currentValue) ?? DateTime(2000),
         firstDate: DateTime(1900),
         lastDate: DateTime.now(),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme.light(
+                primary: Color(0xFF4FA095),
+                onPrimary: Colors.white,
+                surface: Color(0xFFBAD1C2),
+                onSurface: Color(0xFF25766B),
+              ),
+            ),
+            child: child!,
+          );
+        },
       );
 
       if (selectedDate != null) {
@@ -174,11 +190,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await _loadUserData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$label actualitzat correctament')),
+            SnackBar(
+              content: Text('$label actualitzat correctament'),
+              backgroundColor: Color(0xFF4FA095),
+            ),
           );
         }
       }
-
       return;
     }
 
@@ -186,17 +204,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Editar $label'),
+          backgroundColor: Color(0xFFBAD1C2),
+          title: Text('Editar $label', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
           content: TextField(
             controller: controller,
-            decoration: InputDecoration(labelText: label),
+            style: TextStyle(color: Color(0xFF25766B)),
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: TextStyle(color: Color(0xFF4FA095)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095))),
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel·lar'),
+              child: Text('Cancel·lar', style: TextStyle(color: Color(0xFF25766B))),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF4FA095)),
               onPressed: () async {
                 String newValue = controller.text.trim();
                 await FirebaseFirestore.instance
@@ -206,10 +231,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.pop(context);
                 await _loadUserData();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$label actualitzat correctament')),
+                  SnackBar(
+                    content: Text('$label actualitzat correctament'),
+                    backgroundColor: Color(0xFF4FA095),
+                  ),
                 );
               },
-              child: const Text('Guardar'),
+              child: Text('Guardar', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -217,53 +245,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _pickAndUploadImage() async {
+  Future<void> _pickAndSaveImageLocally() async {
     final picker = ImagePicker();
     final pickedImage = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedImage == null) return;
 
-    final File imageFile = File(pickedImage.path);
     final user = _authService.currentUser;
-    final storageRef = FirebaseStorage.instance.ref().child('profile_pics/${user!.uid}.jpg');
+    if (user == null) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final uploadTask = await storageRef.putFile(imageFile);
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      await LocalStorageService.deleteProfileImage(user.uid);
+      final localPath = await LocalStorageService.saveProfileImage(
+        pickedImage.path,
+        user.uid
+      );
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({'photoUrl': downloadUrl});
-
-      await _loadUserData();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto de perfil actualitzada')),
-        );
+      if (localPath != null) {
+        await _loadUserData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Foto de perfil actualitzada'),
+              backgroundColor: Color(0xFF4FA095),
+            ),
+          );
+        }
+      } else {
+        throw Exception('No s\'ha pogut guardar la imatge');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al pujar la imatge: ${e.toString()}')),
+          SnackBar(
+            content: Text('Error al guardar la imatge: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
         setState(() => _isLoading = false);
       }
     }
   }
-  
-  // Devuelve el color de la medalla según la cantidad
+
   Color getMedalColor(int count) {
-    if (count >= 100) return Colors.amber; // Oro
-    if (count >= 30) return Colors.grey.shade400; // Plata
-    if (count >= 10) return Colors.brown.shade300; // Bronce
-    return Colors.grey.shade300; // Gris claro
+    if (count >= 100) return Colors.amber;
+    if (count >= 30) return Colors.grey.shade400;
+    if (count >= 10) return Colors.brown.shade300;
+    return Colors.grey.shade300;
   }
-  
-  // Icono para cada tipo de medalla
+
   IconData getMedalIcon(String category) {
     switch (category) {
       case 'Acadèmica': return Icons.school;
@@ -277,12 +309,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       default: return Icons.emoji_events;
     }
   }
-  
-  // Construye una medalla individual
+
   Widget _buildMedalItem(String category, int count) {
     final Color medalColor = getMedalColor(count);
     final IconData medalIcon = getMedalIcon(category);
-    
+
     return Column(
       children: [
         Container(
@@ -315,7 +346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Colors.grey.shade700,
+            color: Colors.white,
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -330,191 +361,177 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
-  
+
   Widget _buildUserInfoSection() {
-  if (_currentUser == null) return const SizedBox.shrink();
-  
-  return Card(
-    margin: const EdgeInsets.symmetric(vertical: 8),
-    elevation: 3,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Profile photo - now larger and centered at the top
-          GestureDetector(
-            onTap: _pickAndUploadImage,
-            child: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 60, // Increased from 40
-                  backgroundImage: _currentUser!.photoUrl.isNotEmpty
-                      ? NetworkImage(_currentUser!.photoUrl)
-                      : null,
-                  child: _currentUser!.photoUrl.isEmpty
-                      ? const Icon(Icons.person, size: 40)
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.blue,
-                      shape: BoxShape.circle,
+    if (_currentUser == null) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF7C9F88), Color(0xFF4FA095)],
+          ),
+          borderRadius: BorderRadius.circular(15.0),
+        ),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: _pickAndSaveImageLocally,
+              child: Stack(
+                children: [
+                  Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: const Color.fromARGB(146, 40, 144, 170),
+                        backgroundImage: _localImagePath != null
+                            ? FileImage(File(_localImagePath!))
+                            : (_currentUser!.photoUrl.isNotEmpty
+                                ? NetworkImage(_currentUser!.photoUrl)
+                                : null),
+                        child: (_localImagePath == null && _currentUser!.photoUrl.isEmpty)
+                            ? Icon(Icons.person, size: 40, color: Colors.white)
+                            : null,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 16,
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF25766B),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    _currentUser!.displayName,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.edit, size: 20, color: Colors.white),
+                  onPressed: _editDisplayName,
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          
-          // User information
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Text(
-                  _currentUser!.displayName,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+            Text(
+              _currentUser!.email,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.9),
               ),
-              IconButton(
-                icon: const Icon(Icons.edit, size: 20),
-                onPressed: _editDisplayName,
-              ),
-            ],
-          ),
-          
-          Text(
-            _currentUser!.email,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
             ),
-            textAlign: TextAlign.center,
+            const SizedBox(height: 16),
+            _buildUserDetail(Icons.location_on, _currentUser!.city, 'city', 'Ciutat'),
+            _buildUserDetail(Icons.cake, _currentUser!.birthDate, 'birthDate', 'Data de naixement'),
+            _buildUserDetail(Icons.work, _currentUser!.bio, 'bio', 'Ocupació'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserDetail(IconData icon, String value, String key, String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.white.withOpacity(0.8)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value.isEmpty ? label : value,
+              style: TextStyle(
+                fontSize: 16,
+                color: value.isEmpty ? Colors.white.withOpacity(0.6) : Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-          
-          const SizedBox(height: 12),
-          
-          // Location row
-          _buildInfoRow(
-            Icons.location_on,
-            _currentUser!.city.isEmpty ? 'Afegir ciutat' : _currentUser!.city,
-            () => _editField('city', _currentUser!.city, 'Ciutat'),
-          ),
-          
-          // Birthdate row
-          _buildInfoRow(
-            Icons.calendar_today,
-            _currentUser!.birthDate.isEmpty ? 'Afegir data de naixement' : _currentUser!.birthDate,
-            () => _editField('birthDate', _currentUser!.birthDate, 'Data de naixement'),
-          ),
-          
-          // Bio row
-          _buildInfoRow(
-            Icons.work,
-            _currentUser!.bio.isEmpty ? 'Afegir biografia' : _currentUser!.bio,
-            () => _editField('bio', _currentUser!.bio, 'Biografia'),
+          IconButton(
+            icon: Icon(Icons.edit, size: 16, color: Colors.white),
+            onPressed: () => _editField(key, value, label),
           ),
         ],
       ),
-    ),
-  );
-}
-// Helper method for building the info rows
-Widget _buildInfoRow(IconData icon, String text, VoidCallback onTap) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.grey[600]),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 16,
-              color: text.startsWith('Afegir') ? Colors.grey[400] : Colors.grey[800],
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.edit, size: 18),
-          onPressed: onTap,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-        ),
-      ],
-    ),
-  );
-}
-  
-  // Construye la sección de estadísticas de tareas
+    );
+  }
+
   Widget _buildTaskStatsSection() {
     return Card(
+      color: Color.fromARGB(183, 118, 192, 182),
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Estadístiques de tasques',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
+                color: Color(0xFF25766B),
               ),
             ),
             const SizedBox(height: 16),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Tareas completadas
-                Expanded(
-                  child: _buildStatItem(
-                    'Completades',
-                    _completedTasks.toString(),
-                    Icons.check_circle,
-                    Colors.green,
-                  ),
+                _buildStatItem(
+                  Icons.check_circle,
+                  const Color.fromARGB(255, 52, 145, 55),
+                  _completedTasks.toString(),
+                  'Completades',
                 ),
-                // Tareas pendientes
-                Expanded(
-                  child: _buildStatItem(
-                    'Pendents',
-                    _pendingTasks.toString(),
-                    Icons.access_time,
-                    Colors.orange,
-                  ),
+                _buildStatItem(
+                  Icons.schedule,
+                  const Color.fromARGB(118, 26, 89, 226),
+                  _pendingTasks.toString(),
+                  'Pendents',
                 ),
-                // Tareas expiradas
-                Expanded(
-                  child: _buildStatItem(
-                    'Expirades',
-                    _expiredTasks.toString(),
-                    Icons.event_busy,
-                    Colors.red,
-                  ),
+                _buildStatItem(
+                  Icons.error,
+                  const Color.fromARGB(200, 244, 67, 54),
+                  _expiredTasks.toString(),
+                  'Vençudes',
                 ),
               ],
             ),
@@ -523,123 +540,88 @@ Widget _buildInfoRow(IconData icon, String text, VoidCallback onTap) {
       ),
     );
   }
-  
-  // Widget para cada estadística
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
+
+  Widget _buildStatItem(IconData icon, Color color, String count, String label) {
+  return Column(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color.fromARGB(155, 190, 219, 210),
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 2),
         ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+        child: Icon(icon, color: color, size: 24),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        count,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: color,
         ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-          ),
-        ),
-      ],
-    );
-  }
-  
-  // Construye la sección de medallas
+      ),
+      Text(
+        label,
+        style: TextStyle(fontSize: 12, color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+      ),
+    ],
+  );
+}
+
   Widget _buildMedalsSection() {
-    if (_currentUser == null) return const SizedBox.shrink();
-    
-    // Filtrar 'Predefined' para mostrarla al final
-    final regularMedals = _medals.entries.where((e) => e.key != 'Predefined').toList();
-    final predefinedMedal = _medals.entries.firstWhere((e) => e.key == 'Predefined', orElse: () => MapEntry('Predefined', 0));
-    
     return Card(
+      color: Color.fromARGB(61, 35, 224, 161),
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Les meves medalles',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
+                    color: Color(0xFF25766B),
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white, width: 1),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.emoji_events, color: Colors.amber, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Total: $_totalMedals',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Total: $_totalMedals',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            
-            // Mostrar medallas en filas de 4
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 0.75,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: regularMedals.length,
-              itemBuilder: (context, index) {
-                final entry = regularMedals[index];
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              alignment: WrapAlignment.center,
+              children: _medals.entries.map((entry) {
                 return _buildMedalItem(entry.key, entry.value);
-              },
+              }).toList(),
+              
             ),
-            
-            // Mostrar medalla predefinida al final si tiene valor
-            if (predefinedMedal.value > 0) ...[
-              const Divider(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildMedalItem('Predefined', predefinedMedal.value),
-                ],
-              ),
-            ],
           ],
         ),
       ),
@@ -648,29 +630,36 @@ Widget _buildInfoRow(IconData icon, String text, VoidCallback onTap) {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Color(0xFFBAD1C2),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF4FA095))),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: Color(0xFFBAD1C2),
       appBar: AppBar(
-        title: const Text('El meu perfil'),
+        backgroundColor: Color(0xFF4FA095),
+        title: Text('El meu perfil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        leading: BackButton(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: Icon(Icons.logout, color: Colors.white),
             onPressed: _logout,
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadUserData,
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  _buildUserInfoSection(),
-                  _buildTaskStatsSection(),
-                  _buildMedalsSection(),
-                ],
-              ),
-            ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildUserInfoSection(),
+            _buildTaskStatsSection(),
+            _buildMedalsSection(),
+          ],
+        ),
+      ),
     );
   }
 }

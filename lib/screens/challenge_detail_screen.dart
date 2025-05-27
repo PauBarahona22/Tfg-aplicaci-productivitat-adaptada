@@ -21,19 +21,18 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   late DateTime _createdAt;
   DateTime? _dueDate;
   bool _isCompleted = false;
-  String _type = 'Personal'; // Siempre será personal para retos nuevos
+  String _type = 'Personal';
   String _category = 'General';
   int _targetCount = 1;
   int _currentCount = 0;
   bool _isExpired = false;
-  bool _isPredefined = false; // Retos creados por la app
+  bool _isPredefined = false;
   bool _isSaving = false;
   late final String _uid;
-  // Variable para controlar si ya se mostró el popup de medalla
+
   bool _medalPopupShown = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _docSub;
-  
-  // Categorías disponibles (iguales a las de tareas)
+
   static const List<String> _categoryOptions = [
     'General',
     'Acadèmica',
@@ -44,12 +43,12 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     'Artística',
     'Mascota',
   ];
-  
+
   @override
   void initState() {
     super.initState();
     _uid = FirebaseAuth.instance.currentUser!.uid;
-    
+
     if (widget.challenge != null) {
       final c = widget.challenge!;
       _titleCtrl.text = c.title;
@@ -64,8 +63,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       _currentCount = c.currentCount;
       _isExpired = c.isExpired;
       _isPredefined = c.isPredefined;
-      
-      // Solo escuchar actualizaciones para retos predefinidos
+
       if (c.isPredefined) {
         _docSub = FirebaseFirestore.instance
             .collection('challenges')
@@ -77,7 +75,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       _createdAt = DateTime.now();
     }
   }
-  
+
   void _onRemoteUpdate(DocumentSnapshot<Map<String, dynamic>> doc) {
     if (!doc.exists || !mounted) return;
     final c = ChallengeModel.fromDoc(doc);
@@ -86,7 +84,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       _isCompleted = c.isCompleted;
     });
   }
-  
+
   @override
   void dispose() {
     _docSub?.cancel();
@@ -95,26 +93,51 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     _targetCountCtrl.dispose();
     super.dispose();
   }
-  
+
   Future<void> _pickDueDate() async {
-    // Solo permitir seleccionar fecha para retos personales
     if (_isPredefined) return;
-    
+
     final now = DateTime.now();
     final selectedDate = await showDatePicker(
       context: context,
       initialDate: _dueDate ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF4FA095),
+              onPrimary: Colors.white,
+              surface: Color(0xFFBAD1C2),
+              onSurface: Color(0xFF25766B),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
-    
+
     if (selectedDate == null) return;
-    
+
     final selectedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_dueDate ?? DateTime(now.year, now.month, now.day, 23, 59)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF4FA095),
+              onPrimary: Colors.white,
+              surface: Color(0xFFBAD1C2),
+              onSurface: Color(0xFF25766B),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
-    
+
     final dueDate = DateTime(
       selectedDate.year,
       selectedDate.month,
@@ -122,95 +145,79 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       selectedTime?.hour ?? 23,
       selectedTime?.minute ?? 59,
     );
-    
+
     setState(() => _dueDate = dueDate);
   }
-  
+
   Future<void> _removeDueDate() async {
     if (_isPredefined) return;
     setState(() => _dueDate = null);
   }
-  
+
   Future<void> _selectCategory() async {
-    // Solo permitir cambiar categoría para retos personales
     if (_isPredefined) return;
-    
+
     final selectedCategory = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: Color(0xFFBAD1C2),
       builder: (_) => ListView(
         shrinkWrap: true,
         children: _categoryOptions
             .map((category) => ListTile(
-                  title: Text(category),
+                  title: Text(category, style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
                   onTap: () => Navigator.pop(context, category),
                 ))
             .toList(),
       ),
     );
-    
+
     if (selectedCategory != null) {
       setState(() => _category = selectedCategory);
     }
   }
-  
+
   Future<void> _incrementProgress() async {
-    // Solo incrementar progreso de retos personales
     if (_isPredefined) return;
-    
-    // No incrementar si ya está completo
     if (_isCompleted) return;
-    
+
     final bool wasCompleted = _isCompleted;
-    
+
     setState(() {
       _currentCount++;
       if (_currentCount >= _targetCount) {
         _isCompleted = true;
       }
     });
-    
-    // If it just got completed, directly update the medals
+
     if (!wasCompleted && _isCompleted && !_medalPopupShown) {
-      // Update medals in Firestore
       await _challengeService.updateUserMedals(
         _uid,
         _category,
         _isPredefined
       );
-      
-      // Marcar que ya se mostró el popup
+
       _medalPopupShown = true;
-      
-      // Show medal dialog
       await _showMedalAchievedDialog();
     }
   }
-  
-  // Nuevo método para decrementar el progreso
+
   Future<void> _decrementProgress() async {
-    // Solo decrementar progreso de retos personales
     if (_isPredefined) return;
-    
-    // No decrementar si ya está en 0
     if (_currentCount <= 0) return;
-    
+
     setState(() {
       _currentCount--;
-      // Si estaba completado y ahora no, actualizamos el estado
       if (_currentCount < _targetCount) {
         _isCompleted = false;
-        // Resetear la bandera del popup si se quita el estado de completado
         _medalPopupShown = false;
       }
     });
   }
-  
-  // Nuevo método para mostrar el popup de medalla conseguida
+
   Future<void> _showMedalAchievedDialog() async {
-    // Obtener icono según categoría
     IconData medalIcon;
     Color medalColor;
-    
+
     switch (_category) {
       case 'Acadèmica':
         medalIcon = Icons.school;
@@ -244,16 +251,18 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         medalIcon = Icons.emoji_events;
         medalColor = Colors.amber;
     }
-    
+
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text(
-          '¡Medalla aconseguida!', 
+        backgroundColor: Color(0xFFBAD1C2),
+        title: Text(
+          '¡Medalla aconseguida!',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF25766B),
           ),
         ),
         content: Column(
@@ -277,12 +286,13 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
             Text(
               'Has guanyat una medalla $_category',
               textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 10),
             Text(
               'Continua completant reptes per guanyar més medalles!',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              style: TextStyle(color: Color(0xFF3A8B80), fontSize: 12),
             ),
           ],
         ),
@@ -291,21 +301,20 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
             child: ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: medalColor,
+                backgroundColor: Color(0xFF25766B),
               ),
-              child: const Text('Genial!'),
+              child: Text('Genial!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
       ),
     );
   }
-  
-  // Método para construir el widget de medalla que se conseguirá
+
   Widget _buildMedalToAchieve() {
     IconData medalIcon;
     Color medalColor;
-    
+
     switch (_category) {
       case 'Acadèmica':
         medalIcon = Icons.school;
@@ -339,22 +348,23 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         medalIcon = Icons.emoji_events;
         medalColor = Colors.amber;
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Color.fromARGB(61, 35, 224, 161),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
       ),
       child: Column(
         children: [
-          const Text(
+          Text(
             'Medalla que s\'aconseguirà',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF25766B),
             ),
           ),
           const SizedBox(height: 10),
@@ -384,53 +394,45 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
             _type,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: Color(0xFF3A8B80),
             ),
           ),
         ],
       ),
     );
   }
-  
+
   Future<void> _save() async {
-    // Validación
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El títol és obligatori')),
+        SnackBar(content: Text('El títol és obligatori'), backgroundColor: Color(0xFF3A8B80)),
       );
       return;
     }
-    
-    // Validar cantidad objetivo
+
     int? targetCount = int.tryParse(_targetCountCtrl.text.trim());
     if (targetCount == null || targetCount < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La quantitat objectiu ha de ser un número vàlid major o igual a 1')),
+        SnackBar(content: Text('La quantitat objectiu ha de ser un número vàlid major o igual a 1'), backgroundColor: Color(0xFF3A8B80)),
       );
       return;
     }
-    
+
     setState(() => _isSaving = true);
-    
+
     try {
       final isNew = widget.challenge == null;
-      
-      // Actualizar valores
       _targetCount = targetCount;
-      
-      // Si es un reto predefinido, no permitir modificar ciertos campos
+
       if (_isPredefined) {
-        // No modificar nada para retos predefinidos
         if (mounted) {
           setState(() => _isSaving = false);
-          // Importante: Primero actualizar el estado y después navegar
           Navigator.of(context).pop();
         }
         return;
       }
-      
-      // Crear objeto Challenge
+
       final challenge = ChallengeModel(
         id: isNew ? 'temp' : widget.challenge!.id,
         ownerId: _uid,
@@ -446,43 +448,33 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         isExpired: _isExpired,
         isPredefined: _isPredefined,
       );
-      
-      // Determinar si es un reto recién completado
+
       final bool wasCompleted = isNew ? false : widget.challenge!.isCompleted;
       final bool isNewlyCompleted = !wasCompleted && _isCompleted;
-      
-      // Guardar en Firebase
+
       if (isNew) {
         await _challengeService.addChallenge(challenge);
       } else {
-        // Actualizar el reto
         await _challengeService.updateChallenge(challenge);
-        
-        // Si el reto acaba de completarse y no se ha mostrado el popup, actualizar medallas
+
         if (isNewlyCompleted && !_medalPopupShown) {
-          // Actualizar medallas en Firestore
           await _challengeService.updateUserMedals(
             _uid,
             _category,
             _isPredefined
           );
-          
-          // Marcar que ya se mostró el popup
+
           _medalPopupShown = true;
-          
-          // Mostrar diálogo de medalla
           await _showMedalAchievedDialog();
         }
       }
-      
-      // Es crucial asegurarse que este código se ejecute
+
       if (mounted) {
-        setState(() => _isSaving = false); // Desactivar estado de carga primero
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isNew ? 'Repte creat correctament' : 'Repte actualitzat correctament')),
+          SnackBar(content: Text(isNew ? 'Repte creat correctament' : 'Repte actualitzat correctament'), backgroundColor: Color(0xFF4FA095)),
         );
-        
-        // Usar Future.delayed para garantizar que la navegación se produce después de todo lo demás
+
         Future.delayed(Duration.zero, () {
           if (mounted) {
             Navigator.of(context).pop();
@@ -490,55 +482,54 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         });
       }
     } catch (e) {
-      // En caso de error, mostrar mensaje y permitir al usuario intentar de nuevo
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Color(0xFF3A8B80)),
         );
       }
     }
   }
-  
+
   Future<void> _delete() async {
-    // No permitir eliminar retos predefinidos
     if (_isPredefined) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No es poden eliminar els reptes predefinits')),
+        SnackBar(content: Text('No es poden eliminar els reptes predefinits'), backgroundColor: Color(0xFF3A8B80)),
       );
       return;
     }
-    
-    // Confirmar eliminación
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar repte'),
-        content: const Text('Estàs segur que vols eliminar aquest repte?'),
+        backgroundColor: Color(0xFFBAD1C2),
+        title: Text('Eliminar repte', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
+        content: Text('Estàs segur que vols eliminar aquest repte?', style: TextStyle(color: Color(0xFF25766B))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel·lar'),
+            child: Text('Cancel·lar', style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w600)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF25766B)),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar'),
+            child: Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
     );
-    
+
     if (confirm != true) return;
-    
+
     setState(() => _isSaving = true);
-    
+
     try {
       await _challengeService.deleteChallenge(widget.challenge!.id);
-      
+
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Repte eliminat correctament')),
+          SnackBar(content: Text('Repte eliminat correctament'), backgroundColor: Color(0xFF4FA095)),
         );
         Navigator.of(context).pop();
       }
@@ -546,330 +537,54 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar el repte: ${e.toString()}')),
+          SnackBar(content: Text('Error al eliminar el repte: ${e.toString()}'), backgroundColor: Color(0xFF3A8B80)),
         );
       }
     }
   }
-  
+
   Future<void> _forceComplete() async {
     if (_isCompleted) return;
-    
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Marcar com a completat'),
-        content: const Text('Segur que vols marcar aquest repte com a completat?'),
+        backgroundColor: Color(0xFFBAD1C2),
+        title: Text('Marcar com a completat', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
+        content: Text('Segur que vols marcar aquest repte com a completat?', style: TextStyle(color: Color(0xFF25766B))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel·lar'),
+            child: Text('Cancel·lar', style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w600)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF25766B)),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Marcar'),
+            child: Text('Marcar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
     );
-    
+
     if (confirm != true) return;
-    
+
     setState(() {
       _currentCount = _targetCount;
       _isCompleted = true;
     });
-    
-    // Si no se ha mostrado el popup, actualizar medallas
+
     if (!_medalPopupShown) {
-      // Actualizar medallas en Firestore
       await _challengeService.updateUserMedals(
         _uid,
         _category,
         _isPredefined
       );
-      
-      // Marcar que ya se mostró el popup
+
       _medalPopupShown = true;
-      
-      // Mostrar diálogo de medalla
       await _showMedalAchievedDialog();
     }
   }
-  
-  @override
-  Widget build(BuildContext context) {
-    final isEdit = widget.challenge != null;
-    final isPredefined = _isPredefined;
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEdit
-            ? isPredefined
-                ? 'Detall del repte'
-                : 'Editar repte'
-            : 'Nou repte'),
-        actions: [
-          // Botón de eliminar solo para edición
-          if (isEdit && !isPredefined)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _delete,
-            ),
-        ],
-      ),
-      body: _isSaving
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 1. Campo título
-                  TextField(
-                    controller: _titleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Títol del repte',
-                      border: OutlineInputBorder(),
-                    ),
-                    readOnly: isPredefined,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // 2. Campo descripción
-                  TextField(
-                    controller: _descriptionCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Descripció (opcional)',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 3,
-                    readOnly: isPredefined,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // 3. Sección de categoría
-                  GestureDetector(
-                    onTap: isPredefined ? null : _selectCategory,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _getCategoryIcon(_category),
-                            color: _getCategoryColor(_category),
-                          ),
-                          const SizedBox(width: 8),
-                          Text('Categoria: $_category'),
-                          const Spacer(),
-                          if (!isPredefined)
-                            const Icon(Icons.arrow_drop_down),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // 4. Sección de cantidad objetivo
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _targetCountCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Quantitat objectiu',
-                            border: OutlineInputBorder(),
-                          ),
-                          readOnly: isPredefined,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // 5. Sección de fecha límite (solo para retos no predefinidos)
-                  if (!isPredefined)
-                    GestureDetector(
-                      onTap: _pickDueDate,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.calendar_today),
-                            const SizedBox(width: 8),
-                            Text(
-                              _dueDate == null
-                                  ? 'Sense data límit'
-                                  : 'Data límit: ${DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!)}',
-                            ),
-                            const Spacer(),
-                            if (_dueDate != null)
-                              IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: _removeDueDate,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  
-                  // Sección de progreso (solo para edición)
-                  if (isEdit) ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Progres actual:',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: _targetCount > 0
-                          ? _currentCount / _targetCount
-                          : 0,
-                      minHeight: 15,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Completat: $_currentCount/$_targetCount',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${((_currentCount / _targetCount) * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Botones de incremento/decremento para retos personales
-                    if (!isPredefined && !_isCompleted)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _decrementProgress,
-                            icon: const Icon(Icons.remove),
-                            label: const Text('Decrementar'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red[400],
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          ElevatedButton.icon(
-                            onPressed: _incrementProgress,
-                            icon: const Icon(Icons.add),
-                            label: const Text('Incrementar'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green[400],
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    
-                    // Botón para marcar como completado
-                    if (!_isCompleted)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: ElevatedButton.icon(
-                          onPressed: _forceComplete,
-                          icon: const Icon(Icons.check_circle),
-                          label: const Text('Marcar com completat'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 48),
-                          ),
-                        ),
-                      ),
-                    
-                    // Mensaje de felicitación si está completo
-                    if (_isCompleted)
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Repte completat!',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Has guanyat una medalla $_category!',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                  
-                  // Mostrar la sección de medalla a conseguir si el reto no está completado
-                  if (!_isCompleted) 
-                    _buildMedalToAchieve(),
-                  
-                  // Botón de guardar
-                  if (!isPredefined)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: ElevatedButton(
-                        onPressed: _save,
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 48),
-                        ),
-                        child: Text(isEdit ? 'Actualitzar' : 'Crear'),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-    );
-  }
-  
+
   IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'Acadèmica':
@@ -890,7 +605,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         return Icons.emoji_events;
     }
   }
-  
+
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'Acadèmica':
@@ -910,5 +625,290 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       default:
         return Colors.amber;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.challenge != null;
+    final isPredefined = _isPredefined;
+
+    return Scaffold(
+      backgroundColor: Color(0xFFBAD1C2),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF4FA095),
+        leading: BackButton(color: Colors.white),
+        title: Text(
+          isEdit
+              ? isPredefined
+                  ? 'Detall del repte'
+                  : 'Editar repte'
+              : 'Nou repte',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        actions: [
+          if (isEdit && !isPredefined)
+            IconButton(
+              icon: Icon(Icons.delete, color: Colors.white),
+              onPressed: _delete,
+            ),
+        ],
+      ),
+      body: _isSaving
+          ? Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _titleCtrl,
+                    style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Títol del repte',
+                      labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                      border: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095), width: 2)),
+                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                    ),
+                    readOnly: isPredefined,
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: _descriptionCtrl,
+                    style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Descripció (opcional)',
+                      labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                      border: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095), width: 2)),
+                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                    ),
+                    maxLines: 3,
+                    readOnly: isPredefined,
+                  ),
+                  const SizedBox(height: 16),
+
+                  GestureDetector(
+                    onTap: isPredefined ? null : _selectCategory,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Color(0xFF25766B)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getCategoryIcon(_category),
+                            color: _getCategoryColor(_category),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('Categoria: $_category', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
+                          const Spacer(),
+                          if (!isPredefined)
+                            Icon(Icons.arrow_drop_down, color: Color(0xFF25766B)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _targetCountCtrl,
+                          style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16),
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Quantitat objectiu',
+                            labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                            border: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095), width: 2)),
+                            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                          ),
+                          readOnly: isPredefined,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (!isPredefined)
+                    GestureDetector(
+                      onTap: _pickDueDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Color(0xFF25766B)),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, color: Color(0xFF25766B)),
+                            const SizedBox(width: 8),
+                            Text(
+                              _dueDate == null
+                                  ? 'Sense data límit'
+                                  : 'Data límit: ${DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!)}',
+                              style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                            ),
+                            const Spacer(),
+                            if (_dueDate != null)
+                              IconButton(
+                                icon: Icon(Icons.clear, color: Color(0xFF25766B)),
+                                onPressed: _removeDueDate,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  if (isEdit) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      'Progres actual:',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF25766B),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: _targetCount > 0 ? _currentCount / _targetCount : 0,
+                      minHeight: 15,
+                      borderRadius: BorderRadius.circular(10),
+                      backgroundColor: Color(0xFF9BB8A5),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4FA095)),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Completat: $_currentCount/$_targetCount',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF25766B),
+                          ),
+                        ),
+                        Text(
+                          '${((_currentCount / _targetCount) * 100).toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF25766B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (!isPredefined && !_isCompleted)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _decrementProgress,
+                            icon: const Icon(Icons.remove),
+                            label: Text('Decrementar', style: TextStyle(fontWeight: FontWeight.w600)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red[400],
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          ElevatedButton.icon(
+                            onPressed: _incrementProgress,
+                            icon: const Icon(Icons.add),
+                            label: Text('Incrementar', style: TextStyle(fontWeight: FontWeight.w600)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green[400],
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                    if (!_isCompleted)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: ElevatedButton.icon(
+                          onPressed: _forceComplete,
+                          icon: const Icon(Icons.check_circle),
+                          label: Text('Marcar com completat', style: TextStyle(fontWeight: FontWeight.w600)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF4FA095),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
+                        ),
+                      ),
+
+                    if (_isCompleted)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Color.fromARGB(61, 35, 224, 161),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Repte completat!',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Has guanyat una medalla $_category!',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.green,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+
+                  if (!_isCompleted) _buildMedalToAchieve(),
+
+                  if (!isPredefined)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: ElevatedButton(
+                        onPressed: _save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF25766B),
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
+                        child: Text(
+                          isEdit ? 'Actualitzar repte' : 'Crear repte',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+    );
   }
 }

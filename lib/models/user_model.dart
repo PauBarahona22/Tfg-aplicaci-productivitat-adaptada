@@ -26,7 +26,7 @@ class UserModel {
         'Laboral': 0,
         'Artística': 0,
         'Mascota': 0,
-        'Predefined': 0, // Medallas especiales para retos predefinidos
+        'Predefined': 0, 
       };
 
   Map<String, dynamic> toMap() {
@@ -43,7 +43,6 @@ class UserModel {
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
-    // Convertir el map de medallas si existe
     Map<String, int> medalsMap = {
       'General': 0,
       'Acadèmica': 0,

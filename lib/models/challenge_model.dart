@@ -7,12 +7,12 @@ class ChallengeModel {
   final DateTime createdAt;
   final DateTime? dueDate;
   final bool isCompleted;
-  final String type; // 'Personal' o 'General'
-  final String category; // 'Acadèmica', 'Deportiva', etc.
-  final int targetCount; // Cantidad total a completar
-  final int currentCount; // Cantidad actual completada
-  final bool isExpired; // Si ha expirado (para la eliminación automática)
-  final bool isPredefined; // Indica si es un reto predefinido de la aplicación
+  final String type; 
+  final String category; 
+  final int targetCount; 
+  final int currentCount; 
+  final bool isExpired; 
+  final bool isPredefined; 
   ChallengeModel({
     required this.id,
     required this.ownerId,
@@ -59,7 +59,6 @@ class ChallengeModel {
       isPredefined: isPredefined ?? this.isPredefined,
     );
   }
-  // Obtener el tipo de medalla basado en la categoría
   String get medalType {
     switch (category) {
       case 'Acadèmica': return 'Acadèmica';

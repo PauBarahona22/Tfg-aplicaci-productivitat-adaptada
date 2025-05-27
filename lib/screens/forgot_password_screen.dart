@@ -17,7 +17,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Introdueix un correu electrònic vàlid')),
+        SnackBar(
+          content: Text('Introdueix un correu electrònic vàlid'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
       return;
     }
@@ -34,7 +37,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('S\'ha enviat un correu per restablir la contrasenya')),
+        SnackBar(
+          content: Text('S\'ha enviat un correu per restablir la contrasenya'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
 
       await Future.delayed(const Duration(seconds: 1));
@@ -48,7 +54,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Error en enviar el correu')),
+        SnackBar(
+          content: Text(e.message ?? 'Error en enviar el correu'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
     }
   }
@@ -56,8 +65,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0xFFBAD1C2),
       appBar: AppBar(
-        title: const Text('Recuperar Contrasenya'),
+        backgroundColor: Color(0xFF4FA095),
+        leading: BackButton(color: Colors.white),
+        title: Text(
+          'Recuperar Contrasenya',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -66,16 +81,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           children: [
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Correu electrònic',
+                labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25766B)),
+                ),
               ),
+              style: TextStyle(color: Color(0xFF25766B)),
             ),
             const SizedBox(height: 24),
             _isLoading
-                ? const CircularProgressIndicator()
+                ? CircularProgressIndicator(color: Color(0xFF4FA095))
                 : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF25766B),
+                      padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    ),
                     onPressed: _resetPassword,
-                    child: const Text('Enviar correu de recuperació'),
+                    child: Text(
+                      'Enviar correu de recuperació',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
                   ),
           ],
         ),

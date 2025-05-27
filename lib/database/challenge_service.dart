@@ -5,7 +5,7 @@ import '../models/task_model.dart';
 class ChallengeService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
-  // Stream para obtener todos los retos de un usuario
+
   Stream<List<ChallengeModel>> streamChallenges(String ownerId) {
     return _firestore
         .collection('challenges')
@@ -16,12 +16,12 @@ class ChallengeService {
             snap.docs.map((d) => ChallengeModel.fromDoc(d)).toList());
   }
   
-  // Agregar un nuevo reto
+
   Future<DocumentReference<Map<String, dynamic>>> addChallenge(ChallengeModel challenge) {
     return _firestore.collection('challenges').add(challenge.toMap());
   }
   
-  // Actualizar un reto existente
+
   Future<void> updateChallenge(ChallengeModel challenge) {
     return _firestore
         .collection('challenges')
@@ -29,39 +29,39 @@ class ChallengeService {
         .update(challenge.toMap());
   }
   
-  // Eliminar un reto
+
   Future<void> deleteChallenge(String id) {
     return _firestore.collection('challenges').doc(id).delete();
   }
   
-  // Actualizar el progreso de un reto manualmente
+
   Future<void> incrementChallengeProgress(String challengeId) async {
     final docRef = _firestore.collection('challenges').doc(challengeId);
     
-    // Obtener el documento actual
+
     final docSnap = await docRef.get();
     if (!docSnap.exists) return;
     
     final challenge = ChallengeModel.fromDoc(docSnap);
     
-    // No permitir modificar retos predefinidos manualmente
+
     if (challenge.isPredefined) return;
     
-    // Incrementar contador
+
     int newCount = challenge.currentCount + 1;
     if (newCount > challenge.targetCount) newCount = challenge.targetCount;
     
-    // Verificar si se ha completado el reto
+
     final bool wasCompleted = challenge.isCompleted;
     final bool isNowCompleted = newCount >= challenge.targetCount;
     
-    // Actualizar el contador y el estado
+
     await docRef.update({
       'currentCount': newCount,
       'isCompleted': isNowCompleted,
     });
     
-    // Si acaba de completarse, actualizar medallas
+ 
     if (!wasCompleted && isNowCompleted) {
       await updateUserMedals(
         challenge.ownerId,
@@ -71,10 +71,9 @@ class ChallengeService {
     }
   }
   
-  // Actualizar progreso basado en tareas completadas
+
   Future<void> updatePredefinedChallengesProgress(TaskModel completedTask) async {
-    // Esta función se llamaría cada vez que se completa una tarea
-    // Buscar todos los retos predefinidos de la misma categoría que la tarea
+
     final snapshot = await _firestore
         .collection('challenges')
         .where('ownerId', isEqualTo: completedTask.ownerId)
@@ -83,24 +82,24 @@ class ChallengeService {
         .where('isCompleted', isEqualTo: false)
         .get();
     
-    // Por cada reto predefinido, incrementar su progreso
+
     for (final doc in snapshot.docs) {
       final challenge = ChallengeModel.fromDoc(doc);
       
-      // Incrementar contador
+
       int newCount = challenge.currentCount + 1;
       
-      // Verificar si se ha completado el reto
+
       final bool wasCompleted = challenge.isCompleted;
       final bool isNowCompleted = newCount >= challenge.targetCount;
       
-      // Actualizar el contador y el estado
+
       await doc.reference.update({
         'currentCount': newCount,
         'isCompleted': isNowCompleted,
       });
       
-      // Si acaba de completarse, actualizar medallas
+
       if (!wasCompleted && isNowCompleted) {
         await updateUserMedals(
           challenge.ownerId,
@@ -111,7 +110,7 @@ class ChallengeService {
     }
   }
   
-  // Método auxiliar para obtener la lista de retos predefinidos
+
   List<Map<String, dynamic>> getPredefinedChallengesList() {
     return [
       {
@@ -180,7 +179,7 @@ class ChallengeService {
     ];
   }
   
-  // Crear retos predefinidos para un nuevo usuario
+
   Future<void> createPredefinedChallenges(String userId) async {
     final predefinedChallenges = getPredefinedChallengesList();
     
@@ -201,11 +200,11 @@ class ChallengeService {
     }
   }
   
-  // Verificar retos expirados y marcarlos
+
   Future<void> checkExpiredChallenges(String ownerId) async {
     final now = DateTime.now();
     
-    // Obtener retos con fecha límite que no están completados ni marcados como expirados
+
     final snapshot = await _firestore
         .collection('challenges')
         .where('ownerId', isEqualTo: ownerId)
@@ -214,17 +213,17 @@ class ChallengeService {
         .where('dueDate', isLessThan: now.toIso8601String())
         .get();
     
-    // Marcar como expirados los retos con fecha vencida
+
     for (final doc in snapshot.docs) {
       await doc.reference.update({'isExpired': true});
     }
   }
   
-  // Eliminar retos expirados después de 30 días
+
   Future<void> deleteExpiredChallenges(String ownerId) async {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     
-    // Obtener retos expirados hace más de 30 días
+
     final snapshot = await _firestore
         .collection('challenges')
         .where('ownerId', isEqualTo: ownerId)
@@ -232,21 +231,21 @@ class ChallengeService {
         .where('dueDate', isLessThan: thirtyDaysAgo.toIso8601String())
         .get();
     
-    // Eliminar los retos expirados
+
     for (final doc in snapshot.docs) {
       await doc.reference.delete();
     }
   }
   
-  // Actualizar medallas del usuario cuando completa un reto
+
   Future<void> updateUserMedals(String userId, String category, bool isPredefined) async {
-  // Print logs for debugging
+
   print('Updating medals for user: $userId, category: $category, isPredefined: $isPredefined');
   
   final userRef = _firestore.collection('users').doc(userId);
   
   try {
-    // First, get the current user data to check current medal values
+
     final userDoc = await userRef.get();
     
     if (!userDoc.exists) {
@@ -254,14 +253,14 @@ class ChallengeService {
       return;
     }
     
-    // Get the current medals map
+
     Map<String, dynamic>? currentData = userDoc.data();
     Map<String, dynamic> currentMedals = {};
     
     if (currentData != null && currentData.containsKey('medals')) {
       currentMedals = Map<String, dynamic>.from(currentData['medals']);
     } else {
-      // Initialize medals map if it doesn't exist
+
       currentMedals = {
         'General': 0,
         'Acadèmica': 0,
@@ -275,23 +274,23 @@ class ChallengeService {
       };
     }
     
-    // Update the specific category
+
     int currentCount = currentMedals[category] ?? 0;
     currentMedals[category] = currentCount + 1;
     
-    // Update predefined category if needed
+
     if (isPredefined) {
       int predefinedCount = currentMedals['Predefined'] ?? 0;
       currentMedals['Predefined'] = predefinedCount + 1;
     }
     
-    // Log the updated medals
+
     print('Updated medals: $currentMedals');
     
-    // Apply the update with set() and merge:true to ensure we don't overwrite other fields
+
     await userRef.set({'medals': currentMedals}, SetOptions(merge: true));
     
-    // Verify the update
+
     final verifyDoc = await userRef.get();
     final verifyData = verifyDoc.data();
     if (verifyData != null && verifyData.containsKey('medals')) {
@@ -303,12 +302,12 @@ class ChallengeService {
   }
 }
   
-  // Método para actualizar reto y medallas
+
   Future<void> updateChallengeAndMedals(ChallengeModel challenge, {bool forceCompleted = false}) async {
     final bool wasCompleted = challenge.isCompleted;
     final bool isNowCompleted = forceCompleted || challenge.currentCount >= challenge.targetCount;
     
-    // Si no estaba completado antes pero ahora sí, actualizar medallas
+
     if (!wasCompleted && isNowCompleted) {
       await updateUserMedals(
         challenge.ownerId, 
@@ -317,13 +316,13 @@ class ChallengeService {
       );
     }
     
-    // Actualizar el reto
+
     await updateChallenge(challenge.copyWith(
       isCompleted: isNowCompleted,
     ));
   }
   
-  // Obtener resumen de medallas de un usuario
+
   Future<Map<String, int>> getUserMedalsSummary(String userId) async {
     final userDoc = await _firestore.collection('users').doc(userId).get();
     
@@ -351,22 +350,22 @@ class ChallengeService {
     return result;
   }
   
-  // Método para verificar y crear los retos predefinidos que faltan
+
   Future<void> ensureAllPredefinedChallenges(String userId, List<ChallengeModel> existingChallenges) async {
     final predefinedChallenges = getPredefinedChallengesList();
     
-    // Para cada reto predefinido, verificar si ya existe
+
     for (final predefined in predefinedChallenges) {
       final title = predefined['title'];
       final category = predefined['category'];
       
-      // Verificar si ya existe este reto específico
+
       final exists = existingChallenges.any((c) => 
           c.isPredefined && 
           c.title == title && 
           c.category == category);
       
-      // Si no existe, crearlo
+
       if (!exists) {
         final challenge = ChallengeModel(
           id: 'temp',

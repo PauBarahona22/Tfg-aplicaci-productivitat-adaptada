@@ -21,7 +21,6 @@ class TaskService {
   }
 
   Future<void> updateTask(TaskModel task) async {
-  // Obtener la tarea anterior para comparar el estado de isDone
   TaskModel? previousTask;
   try {
     final doc = await _firestore.collection('tasks').doc(task.id).get();
@@ -29,15 +28,14 @@ class TaskService {
       previousTask = TaskModel.fromDoc(doc);
     }
   } catch (e) {
-    // Si no se puede obtener la tarea anterior, continuar sin comparar
     print('Error obteniendo tarea anterior: $e');
   }
-  // Actualizar la tarea en Firestore
+  
   await _firestore
       .collection('tasks')
       .doc(task.id)
       .update(task.toMap());
-  // Si la tarea acaba de completarse (cambió de false a true), actualizar retos predefinidos
+  
   if (previousTask != null && 
       !previousTask.isDone && 
       task.isDone) {

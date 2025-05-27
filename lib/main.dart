@@ -12,25 +12,25 @@ import 'database/reminder_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inicializar Firebase
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Inicializar formato de fechas en catalán
+
   await initializeDateFormatting('ca', null);
   
-  // Inicializar timezone data y zona local
+
   tz_data.initializeTimeZones();
   tz.setLocalLocation(tz.getLocation('Europe/Madrid'));
   
-  // Modo sistema UI (solo dev)
+
   await SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.manual, 
     overlays: [SystemUiOverlay.bottom, SystemUiOverlay.top]
   );
   
-  // Inicializar ReminderService (crea canal, timezone, etc.)
+
   final reminderService = ReminderService();
   await reminderService.initialize();
   
@@ -44,16 +44,19 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Aplicació TFG',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Color(0xFFBAD1C2), 
+      ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        Locale('ca'), // Català
-        Locale('es'), // Español
-        Locale('en'), // English
+        Locale('ca'), 
+        Locale('es'), 
+        Locale('en'), 
       ],
       home: const SplashScreen(),
     );

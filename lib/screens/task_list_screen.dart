@@ -46,8 +46,9 @@ class _TaskListScreenState extends State<TaskListScreen> {
     final selected = await showMenu<String>(
       context: context,
       position: const RelativeRect.fromLTRB(50, 100, 50, 0),
+      color: Color(0xFFBAD1C2),
       items: _allTypes
-          .map((t) => PopupMenuItem(value: t, child: Text(t)))
+          .map((t) => PopupMenuItem(value: t, child: Text(t, style: TextStyle(color: Color(0xFF25766B)))))
           .toList(),
     );
     if (selected != null) setState(() => _selectedType = selected);
@@ -57,11 +58,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 40,                      // ← altura fixa
+        height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        alignment: Alignment.center,     // centra el contingut verticalment
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
+          color: Color.fromARGB(255, 73, 148, 138),
+          border: Border.all(color: Color.fromARGB(255, 36, 78, 73)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: child,
@@ -72,29 +74,37 @@ class _TaskListScreenState extends State<TaskListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Llistat de Tasques')),
+      backgroundColor: Color(0xFFBAD1C2),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF4FA095),
+        title: Text('Llistat de Tasques', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        
+      ),
       body: Column(
         children: [
-          // 1) Buscador
-          Padding(
+          Container(
+            color: Color(0xFF9BB8A5),
             padding: const EdgeInsets.all(8),
             child: TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
+              style: TextStyle(color: Color(0xFF25766B)),
+              decoration: InputDecoration(
+                prefixIcon: Icon(Icons.search, color: Color(0xFF4FA095)),
                 hintText: 'Buscador de tasques pel nom',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: Color(0xFF25766B).withOpacity(0.7)),
+                border: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095))),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                fillColor: Colors.white,
+                filled: true,
               ),
               onChanged: (v) => setState(() => _searchQuery = v.trim()),
             ),
           ),
-
-          // 2) Fila de filtres amb Row
-          Padding(
+          Container(
+            color: Color(0xFF9BB8A5),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 2.1 Pendents
                 StreamBuilder<List<TaskModel>>(
                   stream: _taskService.streamTasks(_uid),
                   builder: (ctx, snap) {
@@ -102,14 +112,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
                         ? snap.data!.where((t) => !t.isDone).length
                         : 0;
                     return _buildFilterChip(
-                      Text('Pendents: $pendents'),
+                      Text('Pendents: $pendents', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                     );
                   },
                 ),
-
                 const SizedBox(width: 8),
-
-                // 2.2 Filtrar per tipus
                 _buildFilterChip(
                   Image.asset(
                     'assets/filtratgepertipus.PNG',
@@ -118,10 +125,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   ),
                   onTap: _pickType,
                 ),
-
                 const SizedBox(width: 8),
-
-                // 2.3 Ascendent/Descendent
                 _buildFilterChip(
                   Image.asset(
                     _ascending
@@ -132,20 +136,19 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   ),
                   onTap: _toggleAscending,
                 ),
-
                 const SizedBox(width: 8),
-
-                // 2.4 Criteri d'ordenació (s’expandeix per evitar overflow)
                 Expanded(
                   child: _buildFilterChip(
                     DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
                         value: _orderCriterion,
+                        dropdownColor: Color(0xFF7C9F88),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                         items: _allCriteria
                             .map((c) => DropdownMenuItem(
                                   value: c,
-                                  child: Text(c, overflow: TextOverflow.ellipsis),
+                                  child: Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white)),
                                 ))
                             .toList(),
                         onChanged: (v) {
@@ -158,17 +161,14 @@ class _TaskListScreenState extends State<TaskListScreen> {
               ],
             ),
           ),
-
-          // 3) Llista de tasques
           Expanded(
             child: StreamBuilder<List<TaskModel>>(
               stream: _taskService.streamTasks(_uid),
               builder: (ctx, snap) {
                 if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)));
                 }
 
-                // Apliquem cerca, filtre per tipus i orden
                 var tasks = snap.data!;
 
                 if (_searchQuery.isNotEmpty) {
@@ -206,10 +206,16 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 });
 
                 if (tasks.isEmpty) {
-                  return const Center(child: Text('No hi ha tasques'));
+                  return Center(
+                    child: Text(
+                      'No hi ha tasques', 
+                      style: TextStyle(color: Color(0xFF25766B), fontSize: 16, fontWeight: FontWeight.w500)
+                    )
+                  );
                 }
 
                 return ListView.builder(
+                  padding: EdgeInsets.all(8),
                   itemCount: tasks.length,
                   itemBuilder: (ctx, i) {
                     final t = tasks[i];
@@ -223,8 +229,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
                       dotColor = Colors.blue;
                     }
                     return Card(
-                      margin:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      color: Color.fromARGB(61, 35, 224, 161),
+                      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                      shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15.0),
+                                  side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                                ),
                       child: ListTile(
                         leading: GestureDetector(
                           onTap: () {
@@ -242,16 +252,23 @@ class _TaskListScreenState extends State<TaskListScreen> {
                             );
                             _taskService.updateTask(updated);
                           },
-                          child: CircleAvatar(
-                            radius: 12,
-                            backgroundColor: dotColor,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: CircleAvatar(
+                              radius: 12,
+                              backgroundColor: dotColor,
+                            ),
                           ),
                         ),
-                        title: Text(t.title),
+                        title: Text(t.title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                         subtitle: Text(
                           t.dueDate != null
                               ? 'Venciment: ${t.dueDate!.day.toString().padLeft(2, '0')}/${t.dueDate!.month.toString().padLeft(2, '0')}/${t.dueDate!.year}'
                               : 'Sense venciment',
+                          style: TextStyle(color: Colors.white.withOpacity(0.8)),
                         ),
                         onTap: () {
                           Navigator.push(
@@ -269,16 +286,15 @@ class _TaskListScreenState extends State<TaskListScreen> {
           ),
         ],
       ),
-
-      // 4) Botó de nova tasca
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Color(0xFF25766B),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const TaskDetailScreen()),
           );
         },
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add, color: Colors.white),
       ),
     );
   }

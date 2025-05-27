@@ -26,28 +26,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (displayName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El nom d\'usuari no pot estar buit')),
+        SnackBar(
+          content: Text('El nom d\'usuari no pot estar buit'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
       return;
     }
 
     if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Introdueix un correu electrònic vàlid')),
+        SnackBar(
+          content: Text('Introdueix un correu electrònic vàlid'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
       return;
     }
 
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La contrasenya ha de tenir almenys 6 caràcters')),
+        SnackBar(
+          content: Text('La contrasenya ha de tenir almenys 6 caràcters'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
       return;
     }
 
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Les contrasenyes no coincideixen')),
+        SnackBar(
+          content: Text('Les contrasenyes no coincideixen'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
       return;
     }
@@ -68,11 +80,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Compte creat amb èxit!')),
+        SnackBar(
+          content: Text('Compte creat amb èxit!'),
+          backgroundColor: Color(0xFF25766B),
+        ),
       );
 
       await Future.delayed(const Duration(seconds: 1));
@@ -89,8 +107,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0xFFBAD1C2),
       appBar: AppBar(
-        title: const Text('Registrar-se'),
+        backgroundColor: Color(0xFF4FA095),
+        title: Text(
+          'Registrar-se',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -99,39 +122,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             TextField(
               controller: _displayNameController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Nom d\'usuari',
+                labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25766B)),
+                ),
               ),
+              style: TextStyle(color: Color(0xFF25766B)),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Correu electrònic',
+                labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25766B)),
+                ),
               ),
+              style: TextStyle(color: Color(0xFF25766B)),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Contrasenya',
+                labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25766B)),
+                ),
               ),
+              style: TextStyle(color: Color(0xFF25766B)),
               obscureText: true,
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _confirmPasswordController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Confirmar Contrasenya',
+                labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25766B)),
+                ),
               ),
+              style: TextStyle(color: Color(0xFF25766B)),
               obscureText: true,
             ),
             const SizedBox(height: 24),
             _isLoading
-                ? const CircularProgressIndicator()
+                ? CircularProgressIndicator(color: Color(0xFF4FA095))
                 : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF25766B),
+                      padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    ),
                     onPressed: _register,
-                    child: const Text('Registrar-se'),
+                    child: Text(
+                      'Registrar-se',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
                   ),
             const SizedBox(height: 16),
             TextButton(
@@ -141,7 +191,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
                 );
               },
-              child: const Text('Ja tens compte? Inicia sessió'),
+              child: Text(
+                'Ja tens compte? Inicia sessió',
+                style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w500),
+              ),
             ),
           ],
         ),

@@ -26,12 +26,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
     super.initState();
     _reminderService.initialize();
   }
-  
+
   void _toggleAscending() {
     setState(() => _ascending = !_ascending);
   }
-  
-  // Función reutilizable para los chips de filtro con estilo uniforme
+
   Widget _buildFilterChip(Widget child, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -40,7 +39,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
+          color: Color.fromARGB(255, 73, 148, 138),
+          border: Border.all(color: Color.fromARGB(255, 36, 78, 73)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: child,
@@ -51,29 +51,37 @@ class _RemindersScreenState extends State<RemindersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Llistat de Recordatoris')),
+      backgroundColor: Color(0xFFBAD1C2),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF4FA095),
+        title: Text('Llistat de Recordatoris', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        
+      ),
       body: Column(
         children: [
-          // 1) Buscador
-          Padding(
+          Container(
+            color: Color(0xFF9BB8A5),
             padding: const EdgeInsets.all(8),
             child: TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
+              style: TextStyle(color: Color(0xFF25766B)),
+              decoration: InputDecoration(
+                prefixIcon: Icon(Icons.search, color: Color(0xFF4FA095)),
                 hintText: 'Cerca pel títol',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: Color(0xFF25766B).withOpacity(0.7)),
+                border: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095))),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                fillColor: Colors.white,
+                filled: true,
               ),
               onChanged: (v) => setState(() => _searchQuery = v.trim()),
             ),
           ),
-          
-          // 2) Fila de filtros con estilo visual igual al de tareas
-          Padding(
+          Container(
+            color: Color(0xFF9BB8A5),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 2.1 Pendientes
                 StreamBuilder<List<ReminderModel>>(
                   stream: _reminderService.streamReminders(_uid),
                   builder: (_, snap) {
@@ -81,14 +89,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       _pendingCount = snap.data!.where((r) => !r.isDone).length;
                     }
                     return _buildFilterChip(
-                      Text('Pendents: $_pendingCount'),
+                      Text('Pendents: $_pendingCount', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                     );
                   },
                 ),
-                
                 const SizedBox(width: 8),
-                
-                // 2.2 Ascendente/Descendente
                 _buildFilterChip(
                   Image.asset(
                     _ascending
@@ -99,20 +104,19 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   ),
                   onTap: _toggleAscending,
                 ),
-                
                 const SizedBox(width: 8),
-                
-                // 2.3 Criterio de ordenación (expandido para evitar overflow)
                 Expanded(
                   child: _buildFilterChip(
                     DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
                         value: _orderCriterion,
+                        dropdownColor: Color(0xFF7C9F88),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                         items: _allCriteria
                             .map((c) => DropdownMenuItem(
                                   value: c,
-                                  child: Text(c, overflow: TextOverflow.ellipsis),
+                                  child: Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white)),
                                 ))
                             .toList(),
                         onChanged: (v) {
@@ -125,14 +129,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
               ],
             ),
           ),
-          
-          // 3) Lista de recordatorios
           Expanded(
             child: StreamBuilder<List<ReminderModel>>(
               stream: _reminderService.streamReminders(_uid),
               builder: (_, snap) {
                 if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)));
                 }
                 var reminders = snap.data!;
                 if (_searchQuery.isNotEmpty) {
@@ -159,36 +161,48 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   }
                   return _ascending ? cmp : -cmp;
                 });
-                
+
                 if (reminders.isEmpty) {
-                  return const Center(child: Text('No hi ha recordatoris'));
+                  return Center(
+                    child: Text(
+                      'No hi ha recordatoris', 
+                      style: TextStyle(color: Color(0xFF25766B), fontSize: 16, fontWeight: FontWeight.w500)
+                    )
+                  );
                 }
-                
+
                 return ListView.builder(
+                  padding: EdgeInsets.all(8),
                   itemCount: reminders.length,
                   itemBuilder: (_, i) {
                     final r = reminders[i];
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      color: Color.fromARGB(61, 35, 224, 161),
+                      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15.0),
+                        side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                      ),
                       child: ListTile(
                         leading: Icon(
                           r.notificationsEnabled
                               ? Icons.notifications_active
                               : Icons.notifications_off,
                           color: r.notificationsEnabled
-                              ? Colors.blue
-                              : Colors.grey,
+                              ? Color.fromARGB(255, 34, 102, 93)
+                              : const Color.fromARGB(255, 206, 245, 248),
                         ),
-                        title: Text(r.title),
+                        title: Text(r.title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                         subtitle: Text(r.reminderTime != null
                             ? DateFormat('dd/MM/yyyy HH:mm')
                                 .format(r.reminderTime!)
-                            : 'Sense hora'),
+                            : 'Sense hora',
+                            style: TextStyle(color: Colors.white.withOpacity(0.8))),
                         trailing: Icon(
                           r.isDone
                               ? Icons.check_circle
                               : Icons.radio_button_unchecked,
-                          color: r.isDone ? Colors.green : Colors.grey,
+                          color: r.isDone ? const Color.fromARGB(255, 19, 75, 21) : Colors.white.withOpacity(0.6),
                         ),
                         onTap: () {
                           Navigator.push(
@@ -209,7 +223,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
+        backgroundColor: Color(0xFF25766B),
+        child: Icon(Icons.add, color: Colors.white),
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ReminderDetailScreen()),

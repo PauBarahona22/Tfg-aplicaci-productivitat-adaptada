@@ -39,16 +39,13 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
   Future<void> _checkPredefinedChallenges() async {
     try {
-      // Obtener todos los retos actuales
       final challenges = await _challengeService
           .streamChallenges(_uid)
           .first
           .timeout(const Duration(seconds: 5));
-      
-      // Verificar y crear los retos predefinidos que falten
+
       await _challengeService.ensureAllPredefinedChallenges(_uid, challenges);
     } catch (e) {
-      // En caso de error, intentar nuevamente después de unos segundos
       Future.delayed(const Duration(seconds: 5), _checkPredefinedChallenges);
     }
   }
@@ -59,8 +56,9 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     final selected = await showMenu<String>(
       context: context,
       position: const RelativeRect.fromLTRB(50, 100, 50, 0),
+      color: Color(0xFFBAD1C2),
       items: _allTypes
-          .map((t) => PopupMenuItem(value: t, child: Text(t)))
+          .map((t) => PopupMenuItem(value: t, child: Text(t, style: TextStyle(color: Color(0xFF25766B)))))
           .toList(),
     );
     if (selected != null) setState(() => _selectedType = selected);
@@ -74,7 +72,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
+          color: Color.fromARGB(255, 73, 148, 138),
+          border: Border.all(color: Color.fromARGB(255, 36, 78, 73)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: child,
@@ -85,7 +84,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   List<ChallengeModel> _applySearchFilterSort(List<ChallengeModel> input) {
     var list = List<ChallengeModel>.from(input);
 
-    // Búsqueda
     if (_searchQuery.isNotEmpty) {
       list = list
           .where((c) =>
@@ -93,7 +91,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           .toList();
     }
 
-    // Filtrar por tipo
     if (_selectedType != 'Tots') {
       if (_selectedType == 'Generals') {
         list = list.where((c) => c.isPredefined).toList();
@@ -102,7 +99,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
       }
     }
 
-    // Orden
     list.sort((a, b) {
       int cmp;
       switch (_orderCriterion) {
@@ -129,36 +125,45 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Llistat de Reptes')),
+      backgroundColor: Color(0xFFBAD1C2),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF4FA095),
+        title: Text('Llistat de Reptes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        
+      ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Color(0xFF25766B),
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ChallengeDetailScreen()),
         ),
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add, color: Colors.white),
       ),
       body: Column(
         children: [
-          // 1) Buscador
-          Padding(
+          Container(
+            color: Color(0xFF9BB8A5),
             padding: const EdgeInsets.all(8),
             child: TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
+              style: TextStyle(color: Color(0xFF25766B)),
+              decoration: InputDecoration(
+                prefixIcon: Icon(Icons.search, color: Color(0xFF4FA095)),
                 hintText: 'Buscador de reptes pel nom',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: Color(0xFF25766B).withOpacity(0.7)),
+                border: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095))),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                fillColor: Colors.white,
+                filled: true,
               ),
               onChanged: (v) => setState(() => _searchQuery = v.trim()),
             ),
           ),
-
-          // 2) Fila de filtros con iconos custom como en tareas
-          Padding(
+          Container(
+            color: Color(0xFF9BB8A5),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Pendientes
                 StreamBuilder<List<ChallengeModel>>(
                   stream: _challengeService.streamChallenges(_uid),
                   builder: (ctx, snap) {
@@ -168,14 +173,11 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             .length
                         : 0;
                     return _buildFilterChip(
-                      Text('Reptes pendents: $pending'),
+                      Text('Reptes pendents: $pending', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                     );
                   },
                 ),
-
                 const SizedBox(width: 8),
-
-                // Filtrar por tipo (icono custom)
                 _buildFilterChip(
                   Image.asset(
                     'assets/filtratgepertipus.PNG',
@@ -184,10 +186,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                   ),
                   onTap: _pickType,
                 ),
-
                 const SizedBox(width: 8),
-
-                // Ascendente/Descendente (icono custom)
                 _buildFilterChip(
                   Image.asset(
                     _ascending
@@ -198,20 +197,19 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                   ),
                   onTap: _toggleAscending,
                 ),
-
                 const SizedBox(width: 8),
-
-                // Criterio de orden
                 Expanded(
                   child: _buildFilterChip(
                     DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
                         value: _orderCriterion,
+                        dropdownColor: Color(0xFF7C9F88),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                         items: _allCriteria
                             .map((c) => DropdownMenuItem(
                                   value: c,
-                                  child: Text(c, overflow: TextOverflow.ellipsis),
+                                  child: Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white)),
                                 ))
                             .toList(),
                         onChanged: (v) {
@@ -224,29 +222,28 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               ],
             ),
           ),
-
-          // 3) Lista de retos bajo StreamBuilder
           Expanded(
             child: RefreshIndicator(
+              color: Color(0xFF4FA095),
               onRefresh: () => _challengeService.streamChallenges(_uid).first,
               child: StreamBuilder<List<ChallengeModel>>(
                 stream: _challengeService.streamChallenges(_uid),
                 builder: (context, snap) {
                   if (snap.hasError) {
                     return Center(
-                      child: Text('Error: ${snap.error}'),
+                      child: Text('Error: ${snap.error}', style: TextStyle(color: Color(0xFF25766B))),
                     );
                   }
                   if (!snap.hasData) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)));
                   }
 
                   final challenges = _applySearchFilterSort(snap.data!);
                   if (challenges.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
                         'No hi ha reptes. Crea el teu primer repte!',
-                        style: TextStyle(fontSize: 16),
+                        style: TextStyle(fontSize: 16, color: Color(0xFF25766B), fontWeight: FontWeight.w500),
                       ),
                     );
                   }
@@ -259,16 +256,17 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                       .toList(growable: false);
 
                   return ListView(
+                    padding: EdgeInsets.all(8),
                     children: [
                       if (personal.isNotEmpty &&
                           (_selectedType == 'Tots' ||
                               _selectedType == 'Personals')) ...[
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.all(16.0),
                           child: Text(
                             'Reptes personals',
                             style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
+                                fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF25766B)),
                           ),
                         ),
                         ...personal.map(_buildChallengeCard),
@@ -276,12 +274,12 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                       if (general.isNotEmpty &&
                           (_selectedType == 'Tots' ||
                               _selectedType == 'Generals')) ...[
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.all(16.0),
                           child: Text(
                             'Reptes generals',
                             style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
+                                fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF25766B)),
                           ),
                         ),
                         ...general.map(_buildChallengeCard),
@@ -298,45 +296,60 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   }
 
   Widget _buildChallengeCard(ChallengeModel c) {
-    Color circleColor = Colors.blue;
-    if (c.isCompleted) circleColor = Colors.green;
-    if (c.isExpired) circleColor = Colors.red;
+    Color circleColor = const Color.fromARGB(255, 175, 243, 234);
+    if (c.isCompleted) circleColor = const Color.fromARGB(255, 168, 233, 170);
+    if (c.isExpired) circleColor = const Color.fromARGB(138, 230, 206, 205);
+    Color circlebackgroudcolor = const Color.fromARGB(227, 34, 145, 153);
+    if (c.isCompleted) circlebackgroudcolor = const Color.fromARGB(172, 45, 150, 48);
+    if (c.isExpired) circlebackgroudcolor = const Color.fromARGB(139, 244, 67, 54);
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: Color.fromARGB(61, 35, 224, 161),
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+      ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: circleColor.withOpacity(0.2),
+          backgroundColor: circlebackgroudcolor,
           child: Icon(
             c.isPredefined ? Icons.auto_awesome : Icons.person,
             color: circleColor,
           ),
         ),
-        title: Text(c.title),
+        title: Text(c.title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            LinearProgressIndicator(
-              value: c.targetCount > 0
-                  ? c.currentCount / c.targetCount
-                  : 0,
-              backgroundColor: Colors.grey[300],
-              color: c.isCompleted
-                  ? Colors.green
-                  : c.isExpired
-                      ? Colors.red
-                      : Colors.blue,
-              minHeight: 10,
-              borderRadius: BorderRadius.circular(8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color.fromARGB(255, 26, 90, 87), width: 1.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: LinearProgressIndicator(
+                value: c.targetCount > 0
+                    ? c.currentCount / c.targetCount
+                    : 0,
+                backgroundColor: const Color.fromARGB(221, 245, 255, 250),
+                color: c.isCompleted
+                    ? const Color.fromARGB(192, 15, 241, 22)
+                    : c.isExpired
+                        ? Colors.red
+                        : Color.fromARGB(223, 23, 87, 81),
+                minHeight: 10,
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
+            
             const SizedBox(height: 4),
             Text(
               '${c.currentCount}/${c.targetCount}',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: c.isCompleted ? Colors.green : Colors.grey[700],
+                color: Colors.white.withOpacity(0.9),
               ),
             ),
           ],

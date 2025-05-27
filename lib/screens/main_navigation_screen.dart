@@ -26,17 +26,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _setupNotificationActions();
   }
 
-  // Configurar acciones para las notificaciones
+
   Future<void> _setupNotificationActions() async {
     await _reminderService.initialize();
-    
-    // Configurar acciones cuando la app está abierta
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+
+
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
 
-    const AndroidInitializationSettings androidSettings = 
+    const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings iosSettings = 
+    const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
           requestAlertPermission: true,
           requestBadgePermission: true,
@@ -53,15 +53,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       },
     );
 
-    // Nota: Ya no intentamos solicitar permisos aquí, confiamos en el AndroidManifest.xml
+
   }
 
-  // Manejar acciones de las notificaciones
+
   void _handleNotificationAction(NotificationResponse details) async {
     if (details.payload == null) return;
 
     final String reminderId = details.payload!;
-    
+
     switch (details.actionId) {
       case 'complete':
         await _reminderService.completeReminderFromNotification(reminderId);
@@ -73,15 +73,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         await _reminderService.delayReminderFromNotification(reminderId, 60);
         break;
       default:
-        // Cuando se toca la notificación sin acción específica
+
         _navigateToRemindersTab();
         break;
     }
   }
 
-  // Navegar a la pestaña de recordatorios
+
   void _navigateToRemindersTab() {
-    _onItemTapped(3); // Índice de la tab de recordatorios
+    _onItemTapped(3);
   }
 
   void _onPageChanged(int index) {
@@ -124,7 +124,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         child: Row(
           children: List.generate(5, (index) {
             final bool isSelected = _selectedIndex == index;
-            // Ajuste de tamaños: no activo 30, activo 36
+
             final double iconSize = isSelected ? 36 : 30;
 
             return Expanded(

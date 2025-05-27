@@ -107,6 +107,19 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
       initialDate: _dueDate ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF4FA095),
+              onPrimary: Colors.white,
+              surface: Color(0xFFBAD1C2),
+              onSurface: Color(0xFF25766B),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (sel != null) setState(() => _dueDate = sel);
   }
@@ -118,11 +131,37 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
       initialDate: _reminderTime ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF4FA095),
+              onPrimary: Colors.white,
+              surface: Color(0xFFBAD1C2),
+              onSurface: Color(0xFF25766B),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (date == null) return;
     final tm = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_reminderTime ?? now),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF4FA095),
+              onPrimary: Colors.white,
+              surface: Color(0xFFBAD1C2),
+              onSurface: Color(0xFF25766B),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (tm != null) {
       setState(() => _reminderTime = DateTime(
@@ -137,21 +176,26 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
 
   Future<void> _selectTask() async {
     if (_userTasks.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('No tens tasques disponibles')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No tens tasques disponibles'),
+          backgroundColor: Color(0xFF4FA095),
+        ),
+      );
       return;
     }
     final sel = await showModalBottomSheet<TaskModel?>(
       context: context,
+      backgroundColor: Color(0xFFBAD1C2),
       builder: (_) => ListView(
         shrinkWrap: true,
         children: [
           ListTile(
-            title: const Text('Cap tasca'),
+            title: Text('Cap tasca', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
             onTap: () => Navigator.pop(context, null),
           ),
           ..._userTasks.map((t) => ListTile(
-                title: Text(t.title),
+                title: Text(t.title, style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500)),
                 onTap: () => Navigator.pop(context, t),
               ))
         ],
@@ -166,11 +210,12 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
   Future<void> _selectRepetitionPattern() async {
     final sel = await showModalBottomSheet<String?>(
       context: context,
+      backgroundColor: Color(0xFFBAD1C2),
       builder: (_) => ListView(
         shrinkWrap: true,
         children: _repetitionOptions
             .map((o) => ListTile(
-                  title: Text(o),
+                  title: Text(o, style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
                   onTap: () => Navigator.pop(context, o),
                 ))
             .toList(),
@@ -179,19 +224,17 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
     if (sel != null) setState(() => _repetitionPattern = sel);
   }
 
-  // Función para alternar el estado completado del recordatorio
   void _toggleDone() {
     setState(() => _isDone = !_isDone);
-    // Si no es un recordatorio nuevo, guardar el cambio inmediatamente
+
     if (widget.reminder != null) {
       _saveQuiet();
     }
   }
 
-  // Guardar cambios sin mostrar mensajes
   Future<void> _saveQuiet() async {
     if (_titleCtrl.text.trim().isEmpty) return;
-    
+
     final isNew = widget.reminder == null;
     final model = ReminderModel(
       id: isNew ? '' : widget.reminder!.id,
@@ -218,8 +261,12 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
 
   Future<void> _save() async {
     if (_titleCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('El títol no pot estar buit')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('El títol no pot estar buit'),
+          backgroundColor: Color(0xFF3A8B80),
+        ),
+      );
       return;
     }
     setState(() => _isSaving = true);
@@ -243,15 +290,27 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
         await _reminderService.addReminder(model);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Recordatori creat correctament')));
+          SnackBar(
+            content: Text('Recordatori creat correctament'),
+            backgroundColor: Color(0xFF4FA095),
+          ),
+        );
       } else {
         await _reminderService.updateReminder(model);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Canvis desats')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Canvis desats'),
+            backgroundColor: Color(0xFF4FA095),
+          ),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Color(0xFF3A8B80),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -261,11 +320,19 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar recordatori?'),
-        content: const Text('Estàs segur?'),
+        backgroundColor: Color(0xFFBAD1C2),
+        title: Text('Eliminar recordatori?', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600)),
+        content: Text('Estàs segur?', style: TextStyle(color: Color(0xFF25766B))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sí')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), 
+            child: Text('No', style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w600))
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF25766B)),
+            onPressed: () => Navigator.pop(context, true), 
+            child: Text('Sí', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))
+          ),
         ],
       ),
     );
@@ -273,20 +340,23 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
       setState(() => _isSaving = true);
       await _reminderService.deleteReminder(widget.reminder!.id);
       Navigator.pop(context);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Recordatori eliminat')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Recordatori eliminat'),
+          backgroundColor: Color(0xFF4FA095),
+        ),
+      );
     }
   }
 
-  // Obtener el estado actual del recordatorio basado en la fecha de vencimiento
   String get _reminderStatus {
     if (_isDone) return 'Completat';
     if (_dueDate == null) return 'Sense data de venciment';
-    
+
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final dueDate = DateTime(_dueDate!.year, _dueDate!.month, _dueDate!.day);
-    
+
     if (dueDate.isBefore(today)) {
       return 'Vençut';
     } else {
@@ -294,7 +364,6 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
     }
   }
 
-  // Obtener el color para el estado del recordatorio
   Color get _statusColor {
     switch (_reminderStatus) {
       case 'Completat':
@@ -312,70 +381,100 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
   Widget build(BuildContext context) {
     final isNew = widget.reminder == null;
     return Scaffold(
+      backgroundColor: Color(0xFFBAD1C2),
       appBar: AppBar(
-        title: Text(isNew ? 'Nou Recordatori' : 'Editar Recordatori'),
+        backgroundColor: Color(0xFF4FA095),
+        leading: BackButton(color: Colors.white),
+        title: Text(
+          isNew ? 'Nou Recordatori' : 'Editar Recordatori',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
         actions: [
-          // Botón para marcar como completado
           if (!isNew)
             IconButton(
               icon: Icon(_isDone ? Icons.check_circle : Icons.radio_button_unchecked, size: 28),
-              color: _isDone ? Colors.green : Colors.grey,
+              color: _isDone ? Colors.green : Colors.white,
               onPressed: _toggleDone,
             ),
         ],
       ),
       body: _isSaving
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: Color(0xFF4FA095)))
           : Padding(
               padding: const EdgeInsets.all(16),
               child: ListView(
                 children: [
                   TextField(
                     controller: _titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Títol'),
+                    style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Títol',
+                      labelStyle: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF4FA095))),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF25766B))),
+                    ),
                   ),
                   SwitchListTile(
-                    title: const Text('Notificacions'),
+                    title: Text('Notificacions', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16)),
                     value: _notificationsEnabled,
+                    activeColor: Color(0xFF4FA095),
                     onChanged: (v) => setState(() => _notificationsEnabled = v),
                   ),
                   ListTile(
-                    title: const Text('Hora'),
-                    subtitle: Text(_reminderTime == null
-                        ? '—'
-                        : DateFormat('dd/MM/yyyy HH:mm').format(_reminderTime!)),
-                    trailing: IconButton(icon: const Icon(Icons.schedule), onPressed: _pickReminderTime),
+                    title: Text('Hora', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text(
+                      _reminderTime == null
+                          ? '—'
+                          : DateFormat('dd/MM/yyyy HH:mm').format(_reminderTime!),
+                      style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w500, fontSize: 14),
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.schedule, color: Color(0xFF25766B)), 
+                      onPressed: _pickReminderTime
+                    ),
                   ),
                   ListTile(
-                    title: const Text('Repetir'),
-                    subtitle: Text(_repetitionPattern),
-                    trailing: IconButton(icon: const Icon(Icons.repeat), onPressed: _selectRepetitionPattern),
+                    title: Text('Repetir', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text(_repetitionPattern, style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w500, fontSize: 14)),
+                    trailing: IconButton(
+                      icon: Icon(Icons.repeat, color: Color(0xFF25766B)), 
+                      onPressed: _selectRepetitionPattern
+                    ),
                   ),
                   ListTile(
-                    title: const Text('Data venciment'),
-                    subtitle: Text(_dueDate == null
-                        ? '—'
-                        : DateFormat('dd/MM/yyyy').format(_dueDate!)),
-                    trailing: IconButton(icon: const Icon(Icons.calendar_today), onPressed: _pickDueDate),
+                    title: Text('Data venciment', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text(
+                      _dueDate == null
+                          ? '—'
+                          : DateFormat('dd/MM/yyyy').format(_dueDate!),
+                      style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w500, fontSize: 14),
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.calendar_today, color: Color(0xFF25766B)), 
+                      onPressed: _pickDueDate
+                    ),
                   ),
                   ListTile(
-                    title: const Text('Assignar tasca'),
-                    subtitle: Text(_selectedTask?.title ?? '—'),
-                    trailing: IconButton(icon: const Icon(Icons.checklist), onPressed: _selectTask),
+                    title: Text('Assignar tasca', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text(_selectedTask?.title ?? '—', style: TextStyle(color: Color(0xFF3A8B80), fontWeight: FontWeight.w500, fontSize: 14)),
+                    trailing: IconButton(
+                      icon: Icon(Icons.checklist, color: Color(0xFF25766B)), 
+                      onPressed: _selectTask
+                    ),
                   ),
-                  // Estado del recordatorio (Vencido/Vigente)
                   if (!isNew || _dueDate != null)
                     ListTile(
-                      title: const Text('Estat'),
+                      title: Text('Estat', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w600, fontSize: 16)),
                       subtitle: Text(
                         _reminderStatus,
                         style: TextStyle(
                           color: _statusColor,
                           fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                       leading: Icon(
-                        _isDone ? Icons.check_circle : 
+                        _isDone ? Icons.check_circle :
                         (_reminderStatus == 'Vençut' ? Icons.warning : Icons.info),
                         color: _statusColor,
                       ),
@@ -389,8 +488,9 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
           children: [
             Expanded(
               child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF25766B)),
                 onPressed: _save,
-                child: const Text('Guardar'),
+                child: Text('Guardar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               ),
             ),
             if (!isNew) const SizedBox(width: 16),
@@ -398,12 +498,10 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                  side: const BorderSide(color: Colors.grey),
-                  minimumSize: const Size(56, 56),
+                  foregroundColor: Color(0xFF25766B),
                 ),
                 onPressed: _confirmDelete,
-                child: const Icon(Icons.delete),
+                child: Icon(Icons.delete),
               ),
           ],
         ),
