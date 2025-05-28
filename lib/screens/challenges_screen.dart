@@ -173,7 +173,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             .length
                         : 0;
                     return _buildFilterChip(
-                      Text('Reptes pendents: $pending', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      Text('Pendents: $pending', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                     );
                   },
                 ),

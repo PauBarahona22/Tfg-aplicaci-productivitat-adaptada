@@ -26,10 +26,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _setupNotificationActions();
   }
 
-
   Future<void> _setupNotificationActions() async {
     await _reminderService.initialize();
-
 
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
@@ -52,10 +50,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         _handleNotificationAction(details);
       },
     );
-
-
   }
-
 
   void _handleNotificationAction(NotificationResponse details) async {
     if (details.payload == null) return;
@@ -73,12 +68,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         await _reminderService.delayReminderFromNotification(reminderId, 60);
         break;
       default:
-
         _navigateToRemindersTab();
         break;
     }
   }
-
 
   void _navigateToRemindersTab() {
     _onItemTapped(3);
@@ -120,12 +113,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       bottomNavigationBar: Container(
         height: 70,
-        color: Colors.white,
+        color: Color(0xFFBAD1C2),
         child: Row(
           children: List.generate(5, (index) {
             final bool isSelected = _selectedIndex == index;
-
-            final double iconSize = isSelected ? 36 : 30;
+            final double iconSize = isSelected ? 40 : 34;
 
             return Expanded(
               flex: isSelected ? 2 : 1,
@@ -135,14 +127,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   duration: const Duration(milliseconds: 250),
                   curve: Curves.easeInOut,
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue.shade100 : Colors.grey.shade100,
-                    border: Border.all(color: Colors.grey.shade400),
+                    color: isSelected ? Color(0xFF4FA095) : Color(0xFF9BB8A5),
+                    border: Border.all(color: Color(0xFF25766B)),
                   ),
                   alignment: Alignment.center,
                   child: Icon(
                     _getIcon(index),
                     size: iconSize,
-                    color: isSelected ? Colors.blue : Colors.grey,
+                    color: isSelected ? Colors.white : Color(0xFF25766B),
                   ),
                 ),
               ),
