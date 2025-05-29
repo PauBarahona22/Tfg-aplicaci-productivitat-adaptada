@@ -79,6 +79,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Container(
+              width: 120,
+              height: 120,
+              margin: EdgeInsets.only(bottom: 32),
+              child: Image.asset(
+                'assets/images/mascot_logo.png',
+                fit: BoxFit.contain,
+              ),
+            ),
             TextField(
               controller: _emailController,
               decoration: InputDecoration(

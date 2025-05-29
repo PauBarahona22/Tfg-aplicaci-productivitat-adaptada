@@ -255,58 +255,73 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) => Dialog(
         backgroundColor: Color(0xFFBAD1C2),
-        title: Text(
-          '¡Medalla aconseguida!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF25766B),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '¡Medalla aconseguida!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF25766B),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: 180,
+                height: 180,
+                child: Image.asset(
+                  'assets/images/mascot_celebration.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Has guanyat una medalla $_category',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF25766B), 
+                  fontWeight: FontWeight.w500,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 15),
+              Text(
+                'Continua completant reptes per guanyar més medalles!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF3A8B80), 
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF25766B),
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Text(
+                    'Genial!', 
+                    style: TextStyle(
+                      color: Colors.white, 
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: medalColor.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                medalIcon,
-                size: 60,
-                color: medalColor,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Has guanyat una medalla $_category',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Continua completant reptes per guanyar més medalles!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF3A8B80), fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF25766B),
-              ),
-              child: Text('Genial!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ],
       ),
     );
   }

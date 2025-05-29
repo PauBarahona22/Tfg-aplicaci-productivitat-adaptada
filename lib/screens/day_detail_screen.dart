@@ -28,6 +28,27 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
   final ChallengeService _challengeService = ChallengeService();
   final _uid = FirebaseAuth.instance.currentUser!.uid;
 
+  IconData _getTaskTypeIcon(String type) {
+  switch (type) {
+    case 'Acadèmica':
+      return Icons.school;
+    case 'Deportiva':
+      return Icons.sports_soccer;
+    case 'Musical':
+      return Icons.music_note;
+    case 'Familiar':
+      return Icons.family_restroom;
+    case 'Laboral':
+      return Icons.work;
+    case 'Artística':
+      return Icons.palette;
+    case 'Mascota':
+      return Icons.pets;
+    default:
+      return Icons.task;
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     final formattedDate = DateFormat('dd/MM/yyyy', 'ca').format(widget.selectedDay);
@@ -289,48 +310,65 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                           ),
                         )
                       else
-                        ...dayTasks.map((task) => Container(
+                        ...dayTasks.map((task) => Card(
+                          color: Color.fromARGB(61, 35, 224, 161),
                           margin: const EdgeInsets.symmetric(
                             horizontal: 8.0,
                             vertical: 4.0,
                           ),
-                          decoration: BoxDecoration(
-                            color: Color.fromARGB(61, 35, 224, 161),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15.0),
+                            side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
                           ),
                           child: ListTile(
                             title: Text(
                               task.title,
                               style: TextStyle(
-                                color: Color(0xFF25766B),
+                                color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: Text(
                               task.type,
                               style: TextStyle(
-                                color: Color(0xFF3A8B80),
+                                color: Colors.white.withOpacity(0.8),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            leading: CircleAvatar(
-                              backgroundColor: task.isDone
-                                  ? Colors.green
-                                  : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
-                                      ? Colors.red
-                                      : Colors.blue),
-                              radius: 12,
+                            leading: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: CircleAvatar(
+                                backgroundColor: task.isDone
+                                    ? Colors.green
+                                    : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
+                                        ? Colors.red
+                                        : Colors.blue),
+                                radius: 12,
+                              ),
                             ),
-                            trailing: task.dueDate != null
-                                ? Text(
-                                    DateFormat('HH:mm', 'ca').format(task.dueDate!),
-                                    style: TextStyle(
-                                      color: Color(0xFF3A8B80),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  )
-                                : null,
+                            trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getTaskTypeIcon(task.type),
+                                color: const Color.fromARGB(255, 160, 228, 224),
+                                size: 28,
+                              ),
+                              if (task.dueDate != null) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  DateFormat('HH:mm', 'ca').format(task.dueDate!),
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -365,21 +403,21 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                           ),
                         )
                       else
-                        ...dayReminders.map((reminder) => Container(
+                        ...dayReminders.map((reminder) => Card(
+                          color: Color.fromARGB(61, 35, 224, 161),
                           margin: const EdgeInsets.symmetric(
                             horizontal: 8.0,
                             vertical: 4.0,
                           ),
-                          decoration: BoxDecoration(
-                            color: Color.fromARGB(61, 35, 224, 161),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15.0),
+                            side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
                           ),
                           child: ListTile(
                             title: Text(
                               reminder.title,
                               style: TextStyle(
-                                color: Color(0xFF25766B),
+                                color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -388,7 +426,7 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                                   ? DateFormat('HH:mm', 'ca').format(reminder.reminderTime!)
                                   : 'Sense hora',
                               style: TextStyle(
-                                color: Color(0xFF3A8B80),
+                                color: Colors.white.withOpacity(0.8),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -436,28 +474,28 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                           ),
                         )
                       else
-                        ...dayChallenges.map((challenge) => Container(
+                        ...dayChallenges.map((challenge) => Card(
+                          color: Color.fromARGB(61, 35, 224, 161),
                           margin: const EdgeInsets.symmetric(
                             horizontal: 8.0,
                             vertical: 4.0,
                           ),
-                          decoration: BoxDecoration(
-                            color: Color.fromARGB(61, 35, 224, 161),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15.0),
+                            side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
                           ),
                           child: ListTile(
                             title: Text(
                               challenge.title,
                               style: TextStyle(
-                                color: Color(0xFF25766B),
+                                color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: Text(
                               '${challenge.currentCount}/${challenge.targetCount}',
                               style: TextStyle(
-                                color: Color(0xFF3A8B80),
+                                color: Colors.white.withOpacity(0.8),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -481,7 +519,7 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
                                 ? Text(
                                     DateFormat('HH:mm', 'ca').format(challenge.dueDate!),
                                     style: TextStyle(
-                                      color: Color(0xFF3A8B80),
+                                      color: Colors.white.withOpacity(0.9),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   )

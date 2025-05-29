@@ -71,6 +71,27 @@ class _TaskListScreenState extends State<TaskListScreen> {
     );
   }
 
+  IconData _getTaskTypeIcon(String type) {
+    switch (type) {
+      case 'Acadèmica':
+        return Icons.school;
+      case 'Deportiva':
+        return Icons.sports_soccer;
+      case 'Musical':
+        return Icons.music_note;
+      case 'Familiar':
+        return Icons.family_restroom;
+      case 'Laboral':
+        return Icons.work;
+      case 'Artística':
+        return Icons.palette;
+      case 'Mascota':
+        return Icons.pets;
+      default:
+        return Icons.task;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,7 +165,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                         isExpanded: true,
                         value: _orderCriterion,
                         dropdownColor: Color(0xFF7C9F88),
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontWeight: FontWeight.w600),
                         items: _allCriteria
                             .map((c) => DropdownMenuItem(
                                   value: c,
@@ -269,6 +290,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
                               ? 'Venciment: ${t.dueDate!.day.toString().padLeft(2, '0')}/${t.dueDate!.month.toString().padLeft(2, '0')}/${t.dueDate!.year}'
                               : 'Sense venciment',
                           style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                        ),
+                        trailing: Icon(
+                          _getTaskTypeIcon(t.type),
+                          color: const Color.fromARGB(255, 160, 228, 224),
+                          size: 28,
                         ),
                         onTap: () {
                           Navigator.push(

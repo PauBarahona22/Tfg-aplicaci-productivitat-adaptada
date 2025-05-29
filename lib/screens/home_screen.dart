@@ -44,7 +44,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final monthFormatter = DateFormat('MMMM', 'ca');
     final dayName = dayFormatter.format(now);
     final monthName = monthFormatter.format(now);
-    return 'Avui, $dayName, $dayNumber de $monthName';
+    List <String> splitedDay = dayName.split("");
+    String firstletter = splitedDay[0].toUpperCase();
+    String lastletters = splitedDay.sublist(1).join();
+    return '$firstletter$lastletters, $dayNumber de $monthName';
   }
   List<TaskModel> _getTasksForToday(List<TaskModel> allTasks) {
     final today = DateTime.now();
@@ -119,6 +122,26 @@ class _HomeScreenState extends State<HomeScreen> {
       return false;
     }).length;
   }
+  IconData _getTaskTypeIcon(String type) {
+  switch (type) {
+    case 'Acadèmica':
+      return Icons.school;
+    case 'Deportiva':
+      return Icons.sports_soccer;
+    case 'Musical':
+      return Icons.music_note;
+    case 'Familiar':
+      return Icons.family_restroom;
+    case 'Laboral':
+      return Icons.work;
+    case 'Artística':
+      return Icons.palette;
+    case 'Mascota':
+      return Icons.pets;
+    default:
+      return Icons.task;
+  }
+}
   @override
   Widget build(BuildContext context) {
     if (uid == null) {
@@ -375,9 +398,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                       radius: 12,
                                     ),
                                   ),
-                                  trailing: task.dueDate != null
-                                      ? Text(DateFormat('HH:mm', 'ca').format(task.dueDate!), style: TextStyle(color: Colors.white.withOpacity(0.9)))
-                                      : null,
+                                  trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _getTaskTypeIcon(task.type),
+                                          color: const Color.fromARGB(255, 160, 228, 224),
+                                          size: 28,
+                                        ),
+                                        if (task.dueDate != null) ...[
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            DateFormat('HH:mm', 'ca').format(task.dueDate!),
+                                            style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   onTap: () {
                                     Navigator.push(
                                       context,
