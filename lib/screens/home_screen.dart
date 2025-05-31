@@ -123,25 +123,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }).length;
   }
   IconData _getTaskTypeIcon(String type) {
-  switch (type) {
-    case 'Acadèmica':
-      return Icons.school;
-    case 'Deportiva':
-      return Icons.sports_soccer;
-    case 'Musical':
-      return Icons.music_note;
-    case 'Familiar':
-      return Icons.family_restroom;
-    case 'Laboral':
-      return Icons.work;
-    case 'Artística':
-      return Icons.palette;
-    case 'Mascota':
-      return Icons.pets;
-    default:
-      return Icons.task;
+    switch (type) {
+      case 'Acadèmica':
+        return Icons.school;
+      case 'Deportiva':
+        return Icons.sports_soccer;
+      case 'Musical':
+        return Icons.music_note;
+      case 'Familiar':
+        return Icons.family_restroom;
+      case 'Laboral':
+        return Icons.work;
+      case 'Artística':
+        return Icons.palette;
+      case 'Mascota':
+        return Icons.pets;
+      default:
+        return Icons.task;
+    }
   }
-}
   @override
   Widget build(BuildContext context) {
     if (uid == null) {
@@ -346,202 +346,203 @@ class _HomeScreenState extends State<HomeScreen> {
                         final challengesCount = challengeSnapshot.hasData
                             ? _getChallengesCountForToday(challengeSnapshot.data!)
                             : 0;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              color: Color(0xFF9BB8A5),
-                              padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
-                              child: Text(
-                                'Tasques del dia:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            if (todayTasks.isEmpty)
+                        return SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Container(
-                                color: Color(0xFFBAD1C2),
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  child: Text('Tens el dia lliure', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500)),
-                                ),
-                              )
-                            else
-                              ...todayTasks.map((task) => Card(
-                                color: Color.fromARGB(61, 35, 224, 161),
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 8.0,
-                                  vertical: 4.0,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15.0),
-                                  side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
-                                ),
-                                child: ListTile(
-                                  title: Text(task.title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                  subtitle: Text(task.type, style: TextStyle(color: Colors.white.withOpacity(0.8))),
-                                  leading: Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2), 
-                                    ),
-                                    child: CircleAvatar(
-                                      backgroundColor: task.isDone
-                                          ? Colors.green        
-                                          : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
-                                              ? Colors.red       
-                                              : Colors.blue),    
-                                      radius: 12,
-                                    ),
+                                width: double.infinity,
+                                color: Color(0xFF9BB8A5),
+                                padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                                child: Text(
+                                  'Tasques del dia:',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
-                                  trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _getTaskTypeIcon(task.type),
-                                          color: const Color.fromARGB(255, 160, 228, 224),
-                                          size: 28,
-                                        ),
-                                        if (task.dueDate != null) ...[
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            DateFormat('HH:mm', 'ca').format(task.dueDate!),
-                                            style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                                ),
+                              ),
+                              if (todayTasks.isEmpty)
+                                Container(
+                                  color: Color(0xFFBAD1C2),
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    child: Text('Tens el dia lliure', style: TextStyle(color: Color(0xFF25766B), fontWeight: FontWeight.w500)),
+                                  ),
+                                )
+                              else
+                                ...todayTasks.map((task) => Card(
+                                  color: Color.fromARGB(61, 35, 224, 161),
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 8.0,
+                                    vertical: 4.0,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15.0),
+                                    side: BorderSide(color: Color.fromARGB(255, 45, 112, 103), width: 2.0),
+                                  ),
+                                  child: ListTile(
+                                    title: Text(task.title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                    subtitle: Text(task.type, style: TextStyle(color: Colors.white.withOpacity(0.8))),
+                                    leading: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 2), 
+                                      ),
+                                      child: CircleAvatar(
+                                        backgroundColor: task.isDone
+                                            ? Colors.green        
+                                            : (task.dueDate != null && task.dueDate!.isBefore(DateTime.now())
+                                                ? Colors.red       
+                                                : Colors.blue),    
+                                        radius: 12,
+                                      ),
+                                    ),
+                                    trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _getTaskTypeIcon(task.type),
+                                            color: const Color.fromARGB(255, 160, 228, 224),
+                                            size: 28,
                                           ),
+                                          if (task.dueDate != null) ...[
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              DateFormat('HH:mm', 'ca').format(task.dueDate!),
+                                              style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                                            ),
+                                          ],
                                         ],
-                                      ],
-                                    ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => TaskDetailScreen(task: task),
                                       ),
-                                    );
-                                  },
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => TaskDetailScreen(task: task),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                )),
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 16.0,
+                                  right: 16.0,
+                                  top: 16.0,
+                                  bottom: 16.0
                                 ),
-                              )),
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 16.0,
-                                right: 16.0,
-                                top: 16.0,
-                                bottom: 16.0
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => DayDetailScreen(
-                                              selectedDay: DateTime.now(),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: Color(0xFF4FA095),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Color(0xFF3A8B80)),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Color(0xFF25766B).withOpacity(0.3),
-                                              blurRadius: 6,
-                                              offset: Offset(0, 3),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            Icon(
-                                              Icons.notifications,
-                                              color: Colors.white,
-                                              size: 24,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '$remindersCount',
-                                              style: TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => DayDetailScreen(
+                                                selectedDay: DateTime.now(),
                                               ),
                                             ),
-                                            Text(
-                                              'Recordatoris',
-                                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
-                                            ),
-                                          ],
+                                          );
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Color(0xFF4FA095),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Color(0xFF3A8B80)),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Color(0xFF25766B).withOpacity(0.3),
+                                                blurRadius: 6,
+                                                offset: Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Icon(
+                                                Icons.notifications,
+                                                color: Colors.white,
+                                                size: 24,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '$remindersCount',
+                                                style: TextStyle(
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Recordatoris',
+                                                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => DayDetailScreen(
-                                              selectedDay: DateTime.now(),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: Color(0xFF3A8B80),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Color(0xFF25766B)),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Color(0xFF25766B).withOpacity(0.3),
-                                              blurRadius: 6,
-                                              offset: Offset(0, 3),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            Icon(
-                                              Icons.emoji_events,
-                                              color: Colors.white,
-                                              size: 24,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '$challengesCount',
-                                              style: TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => DayDetailScreen(
+                                                selectedDay: DateTime.now(),
                                               ),
                                             ),
-                                            Text(
-                                              'Reptes',
-                                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
-                                            ),
-                                          ],
+                                          );
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Color(0xFF3A8B80),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Color(0xFF25766B)),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Color(0xFF25766B).withOpacity(0.3),
+                                                blurRadius: 6,
+                                                offset: Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Icon(
+                                                Icons.emoji_events,
+                                                color: Colors.white,
+                                                size: 24,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '$challengesCount',
+                                                style: TextStyle(
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Reptes',
+                                                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            const Spacer(),
-                          ],
+                            ],
+                          ),
                         );
                       },
                     );
