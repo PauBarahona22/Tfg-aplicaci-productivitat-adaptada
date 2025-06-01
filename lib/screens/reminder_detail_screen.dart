@@ -87,7 +87,6 @@ class _ReminderDetailScreenState extends State<ReminderDetailScreen> {
         _userTasks = tasks;
         _selectedTask = _userTasks.firstWhere(
           (t) => t.id == _taskId,
-          // ignore: cast_from_null_always_fails
           orElse: () => null as TaskModel,
         );
       });

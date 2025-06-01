@@ -4,7 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import '../models/task_model.dart';
 import '../database/auth_service.dart';
+import '../database/challenge_service.dart';
 import '../database/task_service.dart';
 import '../database/local_storage_service.dart';
 import 'login_screen.dart';
@@ -18,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
+  final ChallengeService _challengeService = ChallengeService();
   final TaskService _taskService = TaskService();
   UserModel? _currentUser;
   bool _isLoading = true;

@@ -215,9 +215,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   }
 
   Future<void> _showMedalAchievedDialog() async {
-    // ignore: unused_local_variable
     IconData medalIcon;
-    // ignore: unused_local_variable
     Color medalColor;
 
     switch (_category) {
