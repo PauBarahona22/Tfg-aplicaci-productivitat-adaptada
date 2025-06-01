@@ -19,6 +19,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final _taskService = TaskService();
   final _titleCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+   // ignore: unused_field
    bool _isSaving = false;
 
   static const List<String> _allTypes = [
